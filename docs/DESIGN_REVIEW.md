@@ -18,3 +18,8 @@ map, and route options. Map colors are reinforced by text labels, and all
 checkpoint data is available in an HTML table. Heatmap rendering uses one
 low-resolution canvas while roads and checkpoints remain crisp vector layers.
 Reduced-motion preferences disable interface transitions.
+
+The final pass moves the phone trip summary below the map and narrows the
+desktop summary, keeping the destination marker unobstructed. A browser
+regression assertion checks the destination label against the summary bounds.
+Route fitting also updates when the map resizes.

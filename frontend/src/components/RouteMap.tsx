@@ -115,6 +115,19 @@ function HeatLayer({
   return null
 }
 
+function fitRoutes(map: L.Map, plan: Plan | null, animate = false) {
+  if (!plan?.routes.length) return
+  const coords = plan.routes.flatMap((route) =>
+    route.geometry.coordinates.map(([lon, lat]) => [lat, lon] as [number, number]),
+  )
+  map.fitBounds(L.latLngBounds(coords), {
+    paddingTopLeft: [45, 65],
+    paddingBottomRight: [65, window.matchMedia('(max-width: 760px)').matches ? 65 : 110],
+    maxZoom: 9,
+    animate: animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  })
+}
+
 function MapControls({
   plan,
   layer,
@@ -127,27 +140,9 @@ function MapControls({
   useEffect(() => {
     if (!plan?.routes.length || plan === previous.current) return
     previous.current = plan
-    const coords = plan.routes.flatMap((r) =>
-      r.geometry.coordinates.map(([lon, lat]) => [lat, lon] as [number, number]),
-    )
-    map.fitBounds(L.latLngBounds(coords), {
-      paddingTopLeft: [65, 65],
-      paddingBottomRight: [80, 140],
-      maxZoom: 9,
-      animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    })
+    fitRoutes(map, plan, true)
   }, [plan, map])
-  const fit = () => {
-    if (!plan?.routes.length) return
-    map.fitBounds(
-      L.latLngBounds(
-        plan.routes.flatMap((r) =>
-          r.geometry.coordinates.map(([lon, lat]) => [lat, lon] as [number, number]),
-        ),
-      ),
-      { padding: [65, 100], maxZoom: 9 },
-    )
-  }
+  const fit = () => fitRoutes(map, plan, true)
   useEffect(() => {
     if (activeCheckpoint)
       map.flyTo([activeCheckpoint.lat, activeCheckpoint.lon], Math.max(8, map.getZoom()), {
@@ -156,7 +151,10 @@ function MapControls({
       })
   }, [activeCheckpoint, map])
   useEffect(() => {
-    const observer = new ResizeObserver(() => map.invalidateSize())
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize()
+      fitRoutes(map, previous.current)
+    })
     observer.observe(map.getContainer())
     return () => observer.disconnect()
   }, [map])

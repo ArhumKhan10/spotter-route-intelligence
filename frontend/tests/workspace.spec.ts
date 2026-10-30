@@ -85,6 +85,21 @@ test('responsive workspace has no horizontal overflow or browser errors', async 
   await expect(page.getByRole('button', { name: /Route B, recommended/ })).toBeVisible()
   await page.waitForTimeout(1000)
   expect(browserErrors).toEqual([])
+  const destinationLabel = await page
+    .locator('.city-map-label')
+    .filter({ hasText: 'Nashville' })
+    .boundingBox()
+  const summary = await page.locator('.journey-card').boundingBox()
+  expect(destinationLabel).not.toBeNull()
+  expect(summary).not.toBeNull()
+  if (destinationLabel && summary) {
+    const overlaps =
+      destinationLabel.x < summary.x + summary.width &&
+      destinationLabel.x + destinationLabel.width > summary.x &&
+      destinationLabel.y < summary.y + summary.height &&
+      destinationLabel.y + destinationLabel.height > summary.y
+    expect(overlaps, 'The destination label must remain clear of the trip summary').toBe(false)
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )

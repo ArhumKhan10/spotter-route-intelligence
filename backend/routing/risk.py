@@ -36,7 +36,8 @@ def summarize(checkpoints, distance_miles):
         miles[max(left['risk']['level'], right['risk']['level'])] += length
     weighted = sum(level * value for level, value in enumerate(miles))
     return {
-        'risk_miles': [round(value, 3) for value in miles],
+        # Keep precision for lexicographic ranking; presentation rounds in React.
+        'risk_miles': miles,
         'average_risk': weighted / distance_miles if distance_miles else 0,
         'max_risk': max((p['risk']['level'] for p in checkpoints), default=0),
         'eligible': miles[4] == 0 and all(p['risk']['level'] < 4 for p in checkpoints),

@@ -2,10 +2,10 @@
 
 Checked on 2026-10-30 using Python 3.12, Node 22, and Microsoft Edge.
 
-- **30 Django tests pass.** They cover threshold edges, strict load boundaries,
+- **31 Django tests pass.** They cover threshold edges, strict load boundaries,
   worst-condition selection, blocked-route exclusion, every ranking priority,
   distance-weighted summaries, nonuniform road-speed ETAs, endpoint spacing,
-  units, time zones, invalid input, and upstream failures.
+  units, time zones, unrounded risk mileage, invalid input, and upstream failures.
 - **10 Playwright checks pass** across 1440px desktop and 390px phone viewports,
   locally and against the public deployment. They exercise route comparison,
   checkpoint inspection, JSON export, slider playback, layer selection,

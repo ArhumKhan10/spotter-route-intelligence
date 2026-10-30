@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from django.conf import settings
 from django.http import JsonResponse, HttpResponse, FileResponse
 from django.views.decorators.http import require_GET, require_POST

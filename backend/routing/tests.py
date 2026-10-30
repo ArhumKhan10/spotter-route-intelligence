@@ -57,6 +57,12 @@ class RiskTests(SimpleTestCase):
         self.assertEqual(summary['risk_miles'], [0, 12, 50, 0, 0])
         self.assertAlmostEqual(summary['average_risk'], 112/62)
 
+    def test_risk_miles_retain_precision_for_ranking(self):
+        points = [{'mile': m, 'risk': {'level': r}} for m, r in [(0, 0), (.0004, 3), (.0008, 0), (1, 0)]]
+        summary = summarize(points, 1)
+        self.assertAlmostEqual(summary['risk_miles'][3], .0008)
+        self.assertAlmostEqual(sum(summary['risk_miles']), 1)
+
 
 class RankingTests(SimpleTestCase):
     def route(self, id, miles, duration=3600, eligible=True, avg=None):

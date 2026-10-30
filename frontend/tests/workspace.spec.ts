@@ -76,6 +76,21 @@ test('live provider failures retain explicitly labeled results', async ({ page }
   await expect(page.getByRole('button', { name: 'Find safest route', exact: true })).toBeEnabled()
 })
 
+test('explains example data and the recommended route in plain language', async ({ page }) => {
+  const explanation = page.getByRole('region', { name: 'Recommendation explanation' })
+  await expect(explanation.getByRole('heading', { name: 'Why Route B?' })).toBeVisible()
+  await expect(explanation).toContainText('Severe weather')
+  await expect(explanation).toContainText('High-risk weather')
+  await expect(explanation).toContainText('20 minutes longer than the fastest route')
+  await expect(page.getByRole('region', { name: 'Forecast data source' })).toContainText(
+    'Real roads with simulated weather',
+  )
+  await page.getByRole('button', { name: /How it works/ }).click()
+  await expect(page.getByRole('dialog')).toContainText(
+    'checks the weather when you will reach each checkpoint',
+  )
+})
+
 test('responsive workspace has no horizontal overflow or browser errors', async ({
   page,
 }, testInfo) => {

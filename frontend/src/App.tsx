@@ -5,8 +5,6 @@ import {
   ArrowUpRight,
   BookmarkSimple,
   CalendarBlank,
-  CaretRight,
-  ChartBar,
   Check,
   CheckCircle,
   CircleNotch,
@@ -19,11 +17,9 @@ import {
   NavigationArrow,
   Pause,
   Play,
-  Question,
   RoadHorizon,
   ShieldCheck,
   Snowflake,
-  Sparkle,
   Truck,
   Warning,
   Wind,
@@ -75,6 +71,12 @@ export default function App() {
   const request = useRef<AbortController | null>(null)
   const selected = plan?.routes.find((r) => r.id === selectedId)
   const recommended = plan?.routes.find((r) => r.id === plan.recommended_id)
+  const fastestMinutes = plan
+    ? Math.min(...plan.routes.map((r) => Math.round(r.duration_seconds / 60)))
+    : 0
+  const recommendationExtraMinutes = recommended
+    ? Math.round(recommended.duration_seconds / 60) - fastestMinutes
+    : 0
   const legendTitle =
     layer === 'wind'
       ? 'Wind gusts · mph'
@@ -253,73 +255,17 @@ export default function App() {
           </button>
         </nav>
         <div className="topbar-right">
-          <span className="system-status">
-            <span />
-            Built for the road ahead
-          </span>
-          <button
-            className="avatar"
-            aria-label="About this workspace"
-            onClick={() => setModal('method')}
-          >
-            AK
+          <button className="saved-trips-button" onClick={() => setModal('saved')}>
+            <BookmarkSimple size={17} /> Saved trips
           </button>
         </div>
       </header>
 
-      <aside className="rail" aria-label="Workspace navigation">
-        <div className="rail-group">
-          <button
-            className={`rail-button ${!modal ? 'active' : ''}`}
-            title="Route planner"
-            aria-label="Route planner"
-            onClick={() => setModal(null)}
-          >
-            <MapTrifold size={23} />
-          </button>
-          <button
-            className={`rail-button ${modal === 'compare' ? 'active' : ''}`}
-            title="Compare routes"
-            aria-label="Compare routes"
-            onClick={() => setModal('compare')}
-          >
-            <ChartBar size={22} />
-          </button>
-          <button
-            className={`rail-button ${modal === 'saved' ? 'active' : ''}`}
-            title="Saved trips"
-            aria-label="Saved trips"
-            onClick={() => setModal('saved')}
-          >
-            <BookmarkSimple size={22} />
-          </button>
-        </div>
-        <div className="rail-group">
-          <div className="rail-truck">
-            <Truck size={23} />
-          </div>
-          <button
-            className="rail-button"
-            title="Risk rules and help"
-            aria-label="Risk rules and help"
-            onClick={() => setModal('method')}
-          >
-            <Question size={23} />
-          </button>
-          <span className="rail-version">v1.0</span>
-        </div>
-      </aside>
-
       <main className="main-workspace">
         <div className="page-heading">
           <div>
-            <div className="breadcrumb">
-              Workspace <CaretRight size={11} /> Route planner
-            </div>
-            <h1>
-              A clearer road ahead<span>.</span>
-            </h1>
-            <p>Know the weather. Weigh your options. Drive with confidence.</p>
+            <h1>Weather-aware route planner</h1>
+            <p>Compare the weather your truck will meet along the way.</p>
           </div>
           <button
             className="example-button"
@@ -327,9 +273,8 @@ export default function App() {
             disabled={loading}
             onClick={loadExample}
           >
-            <Sparkle size={16} />
-            <span>Explore example trip</span>
-            <ArrowUpRight size={15} />
+            <RoadHorizon size={17} />
+            <span>Load example trip</span>
           </button>
         </div>
 
@@ -337,7 +282,7 @@ export default function App() {
           <div className="planner-column">
             <section className="trip-planner" aria-labelledby="trip-heading">
               <div className="section-heading">
-                <h2 id="trip-heading">Where to?</h2>
+                <h2 id="trip-heading">Trip details</h2>
                 <Truck size={21} />
               </div>
               <form onSubmit={findRoutes}>
@@ -408,7 +353,7 @@ export default function App() {
                     </div>
                   </div>
                   <fieldset className="interval-field">
-                    <legend>Sample every</legend>
+                    <legend>Weather every</legend>
                     <div className="segmented">
                       {[10, 25, 50].map((value) => (
                         <button
@@ -441,7 +386,7 @@ export default function App() {
                 </button>
                 <div className="form-note">
                   <ShieldCheck size={14} />
-                  Weather that accounts for your load.
+                  Fetches live routes and weather forecasts.
                 </div>
               </form>
             </section>
@@ -464,6 +409,267 @@ export default function App() {
                 </button>
               </div>
             )}
+            <section
+              className={`mode-notice ${plan?.mode === 'live' ? 'is-live' : ''}`}
+              aria-label="Forecast data source"
+            >
+              <div className="mode-notice-title">
+                <span className="mode-marker" />
+                {plan?.mode === 'live'
+                  ? 'Live weather forecast'
+                  : 'Example trip · simulated weather'}
+              </div>
+              <p>
+                {plan?.mode === 'live'
+                  ? `Updated ${time(plan.generated_at)}. Route weather is checked at each arrival time.`
+                  : 'Real roads with simulated weather. Find safest route fetches a live forecast for your trip.'}
+              </p>
+              {plan?.mode === 'demo' && (
+                <button onClick={loadExample} disabled={loading}>
+                  Refresh example <ArrowRight size={14} />
+                </button>
+              )}
+            </section>
+            {recommended && (
+              <section className="recommendation-evidence" aria-label="Recommendation explanation">
+                <div className="evidence-heading">
+                  <ShieldCheck size={18} />
+                  <h2>Why {recommended.name}?</h2>
+                </div>
+                <p>Weather risk takes priority over driving time.</p>
+                <dl>
+                  <div>
+                    <dt>Severe weather</dt>
+                    <dd>
+                      {recommended.summary.risk_miles[3].toFixed(1)} <span>mi</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>High-risk weather</dt>
+                    <dd>
+                      {recommended.summary.risk_miles[2].toFixed(1)} <span>mi</span>
+                    </dd>
+                  </div>
+                </dl>
+                <div className="evidence-tradeoff">
+                  {recommendationExtraMinutes > 0
+                    ? `${recommendationExtraMinutes} minutes longer than the fastest route. Less dangerous weather comes first.`
+                    : 'Also the fastest route among options with the best weather risk.'}
+                </div>
+                <button onClick={() => setModal('method')}>
+                  How routes are ranked <ArrowUpRight size={13} />
+                </button>
+              </section>
+            )}
+          </div>
+
+          <div className="results-column">
+            <section className="map-panel" aria-label="Route overview">
+              <div className="map-header">
+                <div className="map-heading">
+                  <span className="live-dot" />
+                  <strong>
+                    {plan ? (
+                      <>
+                        {city(plan.trip.origin.name)} <ArrowRight size={14} />{' '}
+                        {city(plan.trip.destination.name)}
+                      </>
+                    ) : (
+                      'Your trip overview'
+                    )}
+                  </strong>
+                </div>
+                <div className="map-header-actions">
+                  <span className={`data-tag ${plan?.mode === 'live' ? 'live' : ''}`}>
+                    {plan?.mode === 'live' ? 'Live forecast' : 'Example trip'}
+                  </span>
+                  <button
+                    className="icon-button"
+                    aria-label="Save current trip"
+                    disabled={!plan}
+                    onClick={saveTrip}
+                  >
+                    <BookmarkSimple size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="map-stage">
+                <RouteMap
+                  plan={plan}
+                  selectedId={selectedId}
+                  onSelect={select}
+                  hour={hour}
+                  heatmap={heatmap}
+                  layer={layer}
+                  onLayer={setLayer}
+                  onCheckpoint={setCheckpoint}
+                  activeCheckpoint={checkpoint}
+                />
+                {loading && (
+                  <div className="loading-map" role="status">
+                    <CircleNotch size={19} className="spin" />
+                    <span>Comparing roads & checking forecasts</span>
+                    <button
+                      onClick={() => {
+                        request.current?.abort()
+                        setLoading(false)
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <div className="weather-toggle">
+                  <CloudSun size={17} />
+                  <span>Weather overlay</span>
+                  <button
+                    role="switch"
+                    aria-checked={heatmap}
+                    aria-label="Weather overlay"
+                    className={`switch ${heatmap ? 'on' : ''}`}
+                    onClick={() => setHeatmap(!heatmap)}
+                  >
+                    <span />
+                  </button>
+                </div>
+                {checkpoint ? (
+                  <CheckpointDetail point={checkpoint} onClose={() => setCheckpoint(null)} />
+                ) : (
+                  selected && (
+                    <div className="journey-card">
+                      <div className="journey-card-top">
+                        <span
+                          className={
+                            selected.id === plan?.recommended_id
+                              ? 'recommended-text'
+                              : 'alternative-text'
+                          }
+                        >
+                          {selected.id === plan?.recommended_id ? (
+                            <ShieldCheck size={16} weight="fill" />
+                          ) : (
+                            <RoadHorizon size={16} />
+                          )}
+                          {selected.id === plan?.recommended_id
+                            ? `${selected.name} · Recommended`
+                            : !selected.summary.eligible
+                              ? 'No travel conditions ahead'
+                              : `${selected.name} · Alternative`}
+                        </span>
+                        <button
+                          className="icon-button"
+                          onClick={download}
+                          aria-label="Download trip data"
+                        >
+                          <DownloadSimple size={17} />
+                        </button>
+                      </div>
+                      <div className="journey-stats">
+                        <div>
+                          <strong>{duration(selected.duration_seconds)}</strong>
+                          <span>Estimated drive</span>
+                        </div>
+                        <div>
+                          <strong>
+                            {number(selected.distance_miles)}
+                            <small> mi</small>
+                          </strong>
+                          <span>On the road</span>
+                        </div>
+                        <div>
+                          <strong>{time(selected.arrival)}</strong>
+                          <span>Arrival · local</span>
+                        </div>
+                      </div>
+                      <button className="journey-details" onClick={() => setModal('details')}>
+                        <span>
+                          {selected.checkpoints.length} checkpoints <span>·</span> {selected.name}
+                        </span>
+                        <span>
+                          View trip <ArrowRight size={14} />
+                        </span>
+                      </button>
+                    </div>
+                  )
+                )}
+                <div className="risk-legend">
+                  <span>{legendTitle}</span>
+                  <div>
+                    {legendLabels.map((label, i) => (
+                      <span key={label}>
+                        <i style={{ background: COLORS[i] }} />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="forecast-panel">
+                <div className="forecast-heading">
+                  <div>
+                    <Clock size={16} />
+                    <strong>Weather forecast</strong>
+                    <span>48-hour forecast</span>
+                  </div>
+                  <div className="forecast-time">
+                    {plan && time(plan.corridor.times[hour])}{' '}
+                    <span>
+                      {plan &&
+                        new Date(plan.corridor.times[hour]).toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                    </span>
+                  </div>
+                </div>
+                <div className="forecast-control">
+                  <button
+                    className="play-button"
+                    aria-label={playing ? 'Pause forecast' : 'Play forecast'}
+                    onClick={() => setPlaying(!playing)}
+                    disabled={!plan}
+                  >
+                    {playing ? <Pause size={15} weight="fill" /> : <Play size={15} weight="fill" />}
+                  </button>
+                  <div className="slider-wrap">
+                    <input
+                      type="range"
+                      min="0"
+                      max="48"
+                      step="1"
+                      value={hour}
+                      aria-label="Forecast hours ahead"
+                      aria-valuetext={`${hour} hours ahead`}
+                      onChange={(e) => {
+                        setHour(Number(e.target.value))
+                        setPlaying(false)
+                      }}
+                      disabled={!plan}
+                    />
+                    <div className="slider-labels">
+                      {[0, 12, 24, 36, 48].map((h) => (
+                        <button
+                          key={h}
+                          onClick={() => {
+                            setHour(h)
+                            setPlaying(false)
+                          }}
+                          className={h === hour ? 'active' : ''}
+                        >
+                          {h === 0 ? 'Now' : `+${h}h`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="hour-offset">+{hour}h</span>
+                </div>
+                <div className="forecast-footnote">
+                  Area weather preview. Route recommendations use the truck’s arrival time at each
+                  checkpoint.
+                </div>
+              </div>
+            </section>
             <section className="route-options" aria-labelledby="options-heading">
               <div className="options-heading">
                 <h2 id="options-heading">
@@ -473,19 +679,6 @@ export default function App() {
                   Compare <ArrowUpRight size={13} />
                 </button>
               </div>
-              {plan?.mode === 'demo' && (
-                <div className="demo-note">
-                  <span />
-                  <span>Example trip · simulated weather</span>
-                  <button
-                    onClick={loadExample}
-                    disabled={loading}
-                    title="Recalculate example with the selected load and spacing"
-                  >
-                    Refresh
-                  </button>
-                </div>
-              )}
               {dirty && !loading && (
                 <p className="dirty-note">Trip inputs changed. Update routes to apply.</p>
               )}
@@ -509,7 +702,7 @@ export default function App() {
                 ) : (
                   <div className="empty-state">
                     <RoadHorizon size={35} />
-                    <p>{loading ? 'Mapping your possibilities…' : 'Your next trip starts here.'}</p>
+                    <p>{loading ? 'Loading route options…' : 'No route options yet.'}</p>
                     <span>Plan a trip to compare the roads ahead.</span>
                   </div>
                 )}
@@ -517,7 +710,7 @@ export default function App() {
               {recommended && (
                 <div className="recommendation-note">
                   <ShieldCheck size={17} />
-                  <span>Safety first. Then the fastest way there.</span>
+                  <span>Fewest Severe miles, then High miles, then average risk and time.</span>
                   <button
                     aria-label="How routes are recommended"
                     onClick={() => setModal('method')}
@@ -528,217 +721,11 @@ export default function App() {
               )}
             </section>
           </div>
-
-          <section className="map-panel" aria-label="Route overview">
-            <div className="map-header">
-              <div className="map-heading">
-                <span className="live-dot" />
-                <strong>
-                  {plan ? (
-                    <>
-                      {city(plan.trip.origin.name)} <ArrowRight size={14} />{' '}
-                      {city(plan.trip.destination.name)}
-                    </>
-                  ) : (
-                    'Your trip overview'
-                  )}
-                </strong>
-              </div>
-              <div className="map-header-actions">
-                <span className={`data-tag ${plan?.mode === 'live' ? 'live' : ''}`}>
-                  {plan?.mode === 'live' ? 'Live forecast' : 'Example trip'}
-                </span>
-                <button
-                  className="icon-button"
-                  aria-label="Save current trip"
-                  disabled={!plan}
-                  onClick={saveTrip}
-                >
-                  <BookmarkSimple size={18} />
-                </button>
-              </div>
-            </div>
-            <div className="map-stage">
-              <RouteMap
-                plan={plan}
-                selectedId={selectedId}
-                onSelect={select}
-                hour={hour}
-                heatmap={heatmap}
-                layer={layer}
-                onLayer={setLayer}
-                onCheckpoint={setCheckpoint}
-                activeCheckpoint={checkpoint}
-              />
-              {loading && (
-                <div className="loading-map" role="status">
-                  <CircleNotch size={19} className="spin" />
-                  <span>Comparing roads & checking forecasts</span>
-                  <button
-                    onClick={() => {
-                      request.current?.abort()
-                      setLoading(false)
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-              <div className="weather-toggle">
-                <CloudSun size={17} />
-                <span>Weather overlay</span>
-                <button
-                  role="switch"
-                  aria-checked={heatmap}
-                  aria-label="Weather overlay"
-                  className={`switch ${heatmap ? 'on' : ''}`}
-                  onClick={() => setHeatmap(!heatmap)}
-                >
-                  <span />
-                </button>
-              </div>
-              {checkpoint ? (
-                <CheckpointDetail point={checkpoint} onClose={() => setCheckpoint(null)} />
-              ) : (
-                selected && (
-                  <div className="journey-card">
-                    <div className="journey-card-top">
-                      <span
-                        className={
-                          selected.id === plan?.recommended_id
-                            ? 'recommended-text'
-                            : 'alternative-text'
-                        }
-                      >
-                        {selected.id === plan?.recommended_id ? (
-                          <ShieldCheck size={16} weight="fill" />
-                        ) : (
-                          <RoadHorizon size={16} />
-                        )}
-                        {selected.id === plan?.recommended_id
-                          ? 'Your clearest way there'
-                          : !selected.summary.eligible
-                            ? 'No travel conditions ahead'
-                            : 'An alternative way there'}
-                      </span>
-                      <button
-                        className="icon-button"
-                        onClick={download}
-                        aria-label="Download trip data"
-                      >
-                        <DownloadSimple size={17} />
-                      </button>
-                    </div>
-                    <div className="journey-stats">
-                      <div>
-                        <strong>{duration(selected.duration_seconds)}</strong>
-                        <span>Estimated drive</span>
-                      </div>
-                      <div>
-                        <strong>
-                          {number(selected.distance_miles)}
-                          <small> mi</small>
-                        </strong>
-                        <span>On the road</span>
-                      </div>
-                      <div>
-                        <strong>{time(selected.arrival)}</strong>
-                        <span>Arrival · local</span>
-                      </div>
-                    </div>
-                    <button className="journey-details" onClick={() => setModal('details')}>
-                      <span>
-                        {selected.checkpoints.length} weather checkpoints <span>·</span>{' '}
-                        {selected.name}
-                      </span>
-                      <span>
-                        View trip <ArrowRight size={14} />
-                      </span>
-                    </button>
-                  </div>
-                )
-              )}
-              <div className="risk-legend">
-                <span>{legendTitle}</span>
-                <div>
-                  {legendLabels.map((label, i) => (
-                    <span key={label}>
-                      <i style={{ background: COLORS[i] }} />
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="forecast-panel">
-              <div className="forecast-heading">
-                <div>
-                  <Clock size={16} />
-                  <strong>Look down the road</strong>
-                  <span>48-hour forecast</span>
-                </div>
-                <div className="forecast-time">
-                  {plan && time(plan.corridor.times[hour])}{' '}
-                  <span>
-                    {plan &&
-                      new Date(plan.corridor.times[hour]).toLocaleDateString([], {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                  </span>
-                </div>
-              </div>
-              <div className="forecast-control">
-                <button
-                  className="play-button"
-                  aria-label={playing ? 'Pause forecast' : 'Play forecast'}
-                  onClick={() => setPlaying(!playing)}
-                  disabled={!plan}
-                >
-                  {playing ? <Pause size={15} weight="fill" /> : <Play size={15} weight="fill" />}
-                </button>
-                <div className="slider-wrap">
-                  <input
-                    type="range"
-                    min="0"
-                    max="48"
-                    step="1"
-                    value={hour}
-                    aria-label="Forecast hours ahead"
-                    aria-valuetext={`${hour} hours ahead`}
-                    onChange={(e) => {
-                      setHour(Number(e.target.value))
-                      setPlaying(false)
-                    }}
-                    disabled={!plan}
-                  />
-                  <div className="slider-labels">
-                    {[0, 12, 24, 36, 48].map((h) => (
-                      <button
-                        key={h}
-                        onClick={() => {
-                          setHour(h)
-                          setPlaying(false)
-                        }}
-                        className={h === hour ? 'active' : ''}
-                      >
-                        {h === 0 ? 'Now' : `+${h}h`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <span className="hour-offset">+{hour}h</span>
-              </div>
-              <div className="forecast-footnote">
-                Corridor forecast at a fixed time. Route risks use each checkpoint’s arrival time.
-              </div>
-            </div>
-          </section>
         </div>
         <footer className="workspace-footer">
           <span>
-            <ShieldCheck size={13} />A little foresight goes a long way.
+            <ShieldCheck size={13} />
+            Weather and load risk comparison
           </span>
           <span>
             Routing: OSRM <span>·</span> Weather:{' '}
@@ -760,9 +747,9 @@ export default function App() {
         <Modal
           title={
             modal === 'method'
-              ? 'A little more foresight.'
+              ? 'How Spotter chooses a route'
               : modal === 'compare'
-                ? 'Find your clearest route.'
+                ? 'Compare route weather'
                 : modal === 'saved'
                   ? 'Your saved trips.'
                   : `${selected?.name || 'Trip'} · Weather checkpoints`
@@ -1106,14 +1093,15 @@ function Method() {
   return (
     <div className="method">
       <p className="modal-intro">
-        The road is unpredictable. Your planning shouldn’t be. Spotter compares real road options
-        against the weather you’re expected to meet.
+        Enter your start, destination, departure time, and load. Spotter finds road options, checks
+        the weather when you will reach each checkpoint, and recommends the route with less
+        dangerous weather.
       </p>
       <div className="method-steps">
         <div>
           <MapTrifold size={23} />
           <section>
-            <h3>Three ways forward</h3>
+            <h3>Find road options</h3>
             <p>
               OSRM finds real driving routes. If alternatives are limited, we ask for routes through
               intermediate waypoints. Only distinct routes are shown; some trips may have fewer than
@@ -1124,7 +1112,7 @@ function Method() {
         <div>
           <Clock size={23} />
           <section>
-            <h3>The forecast meets your ETA</h3>
+            <h3>Check weather at your arrival time</h3>
             <p>
               We sample every 10, 25, or 50 miles, including both endpoints. Arrival times use
               road-segment durations. Open-Meteo provides hourly rain, snow, and 10 m wind gusts,
@@ -1135,7 +1123,7 @@ function Method() {
         <div>
           <ShieldCheck size={23} />
           <section>
-            <h3>Safety sets the order</h3>
+            <h3>Recommend less dangerous weather</h3>
             <p>
               No Travel routes are excluded. Remaining routes are ordered by fewest Severe miles,
               fewest High miles, lowest distance-weighted average risk, and finally shortest travel

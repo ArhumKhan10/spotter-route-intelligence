@@ -121,8 +121,8 @@ function fitRoutes(map: L.Map, plan: Plan | null, animate = false) {
     route.geometry.coordinates.map(([lon, lat]) => [lat, lon] as [number, number]),
   )
   map.fitBounds(L.latLngBounds(coords), {
-    paddingTopLeft: [45, 65],
-    paddingBottomRight: [65, window.matchMedia('(max-width: 760px)').matches ? 65 : 110],
+    paddingTopLeft: [40, 55],
+    paddingBottomRight: [55, 70],
     maxZoom: 9,
     animate: animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   })
@@ -242,6 +242,7 @@ export default function RouteMap(props: Props) {
       <MapContainer
         center={[39.2, -87]}
         zoom={6}
+        zoomSnap={0.25}
         zoomControl={false}
         scrollWheelZoom={true}
         attributionControl={true}
@@ -356,7 +357,7 @@ export default function RouteMap(props: Props) {
       </MapContainer>
       <div className="map-caption">
         <CloudSun size={17} />
-        <span>Weather along your way</span>
+        <span>Checkpoints: arrival-time weather</span>
         <span className="caption-dot" />
         <span>{plan?.mode === 'demo' ? 'Example forecast' : 'Arrival-aware forecasts'}</span>
       </div>

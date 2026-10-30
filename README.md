@@ -6,6 +6,7 @@ to encounter, including the effect of load weight on wind risk.
 
 **[Open the hosted application](https://spotter-route-intelligence.vercel.app)**
 · [GitHub source](https://github.com/ArhumKhan10/spotter-route-intelligence)
+· [How to use it](docs/HOW_IT_WORKS.md)
 
 ![Spotter desktop workspace](docs/desktop.png)
 

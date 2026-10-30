@@ -6,12 +6,13 @@ Checked on 2026-10-30 using Python 3.12, Node 22, and Microsoft Edge.
   worst-condition selection, blocked-route exclusion, every ranking priority,
   distance-weighted summaries, nonuniform road-speed ETAs, endpoint spacing,
   units, time zones, unrounded risk mileage, invalid input, and upstream failures.
-- **10 Playwright checks pass** across 1440px desktop and 390px phone viewports,
+- **12 Playwright checks pass** across 1440px desktop and 390px phone viewports,
   locally and against the public deployment. They exercise route comparison,
   checkpoint inspection, JSON export, slider playback, layer selection,
   overlay controls, keyboard city selection, input changes, explicit provider
   errors, horizontal overflow, and destination-label visibility beside the
-  route summary.
+  route summary. The added explanation checks verify example-data labeling,
+  the recommended route’s risk evidence, and the displayed time tradeoff.
 - **Live hosted smoke checks pass:** health, React HTML and JavaScript/CSS,
   example data, live Austin geocoding, and live Chicago–Nashville planning.
   The trip returned three road options, 60 checkpoints at 25-mile spacing,

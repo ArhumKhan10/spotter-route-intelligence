@@ -1,0 +1,14 @@
+.venv
+.git
+frontend/node_modules
+frontend/test-results
+frontend/playwright-report
+backend/.cache
+backend/staticfiles
+docs/*.png
+fs-assessment-spotter.pdf
+CLAUDE.md
+tasks
+.env*
+**/__pycache__
+**/*.pyc

@@ -1,0 +1,11 @@
+.git
+.venv
+.vercel
+frontend/node_modules
+frontend/dist
+frontend/test-results
+backend/staticfiles
+backend/.cache
+**/__pycache__
+docs/*.png
+fs-assessment-spotter.pdf

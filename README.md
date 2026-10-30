@@ -30,8 +30,8 @@ in another terminal; Vite proxies `/api` to Django.
 The initial **example trip** contains real cached Chicago–Nashville OSRM road
 geometries with **explicitly simulated weather**. Click **Find safest route**
 for live forecasts, or search and select different cities. Example mode never
-silently replaces a failed live request. Use **Refresh** beside the example
-label to explore load or checkpoint-spacing changes in the example scenario.
+silently replaces a failed live request. Use **Refresh demo** to explore load
+or checkpoint-spacing changes in the example scenario.
 
 ## What is implemented
 
@@ -51,6 +51,9 @@ label to explore load or checkpoint-spacing changes in the example scenario.
   wind/rain/snow layers, overlay toggle, map zoom, and route fitting.
 - Responsive mobile layout, keyboard city selection, native modal focus
   trapping, reduced-motion support, and self-hosted fonts.
+- A map-led dark/light workspace with persistent appearance settings and
+  compact route choices. Phone users open trip editing through **Edit trip**.
+  Explanations are available on demand.
 - JSON trip export and up to five saved trip inputs on the current device.
 - Timeouts, validation, request bounds, provider caching, a basic request
   throttle, and actionable upstream error messages.
@@ -106,6 +109,11 @@ nonuniform segment speeds, endpoint sampling, validation, HTTP errors, and the
 full example pipeline. Playwright runs desktop and mobile flows using Microsoft
 Edge. Set `PLAYWRIGHT_BASE_URL` to test a deployed app. For another browser,
 change `channel` in `frontend/playwright.config.ts`.
+
+Interaction checks isolate external basemap tiles. To refresh the real-map
+screenshots in `docs`, set `CAPTURE_MAPS=1` and run Playwright with
+`--grep "responsive workspace" --workers=1`. Captures wait for the visible
+tiles and theme transitions; public tile-service availability affects that run.
 
 ## Architecture and APIs
 

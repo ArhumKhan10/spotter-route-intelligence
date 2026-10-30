@@ -9,11 +9,13 @@ import {
   useMap,
 } from 'react-leaflet'
 import L from 'leaflet'
-import { ArrowsOut, Crosshair, Minus, Plus, Stack, CloudSun, Check } from '@phosphor-icons/react'
+import { ArrowsOut, Crosshair, Minus, Plus, Stack, Check } from '@phosphor-icons/react'
 import { COLORS, city, duration, number, time } from '../types'
 import type { Plan, Checkpoint, CorridorPoint } from '../types'
+import type { Theme } from '../useTheme'
 
 type Props = {
+  theme: Theme
   plan: Plan | null
   selectedId: string
   onSelect: (id: string) => void
@@ -121,11 +123,57 @@ function fitRoutes(map: L.Map, plan: Plan | null, animate = false) {
     route.geometry.coordinates.map(([lon, lat]) => [lat, lon] as [number, number]),
   )
   map.fitBounds(L.latLngBounds(coords), {
-    paddingTopLeft: [40, 55],
-    paddingBottomRight: [55, 70],
+    paddingTopLeft: [40, window.matchMedia('(max-width: 900px)').matches ? 130 : 90],
+    paddingBottomRight: [65, window.matchMedia('(max-width: 900px)').matches ? 285 : 190],
     maxZoom: 9,
     animate: animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   })
+}
+
+function BasemapTiles() {
+  const timers = useRef(new Map<HTMLImageElement, ReturnType<typeof setTimeout>>())
+  const handlers = useMemo(() => {
+    const clear = (event: L.TileEvent) => {
+      const tile = event.tile as HTMLImageElement
+      clearTimeout(timers.current.get(tile))
+      timers.current.delete(tile)
+    }
+    return {
+      tileloadstart: (event: L.TileEvent) => {
+        const tile = event.tile as HTMLImageElement
+        // Retry a stalled image once, preserving the provider's normal cache URL.
+        // Leaflet only emits tileloadstart when it creates the tile.
+        timers.current.set(
+          tile,
+          setTimeout(() => {
+            timers.current.delete(tile)
+            if (!tile.isConnected || (tile.complete && tile.naturalWidth > 0)) return
+            const source = tile.src
+            tile.removeAttribute('src')
+            tile.src = source
+          }, 12000),
+        )
+      },
+      tileload: clear,
+      tileunload: clear,
+    }
+  }, [])
+  useEffect(() => {
+    const pending = timers.current
+    return () => {
+      pending.forEach(clearTimeout)
+      pending.clear()
+    }
+  }, [])
+  return (
+    <TileLayer
+      url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      maxZoom={19}
+      keepBuffer={0}
+      eventHandlers={handlers}
+    />
+  )
 }
 
 function MapControls({
@@ -139,8 +187,9 @@ function MapControls({
   const previous = useRef<Plan | null>(null)
   useEffect(() => {
     if (!plan?.routes.length || plan === previous.current) return
+    const firstPlan = previous.current === null
     previous.current = plan
-    fitRoutes(map, plan, true)
+    if (!firstPlan) fitRoutes(map, plan, true)
   }, [plan, map])
   const fit = () => fitRoutes(map, plan, true)
   useEffect(() => {
@@ -151,7 +200,14 @@ function MapControls({
       })
   }, [activeCheckpoint, map])
   useEffect(() => {
+    let firstSize = true
     const observer = new ResizeObserver(() => {
+      if (firstSize) {
+        firstSize = false
+        return
+      }
+      const size = map.getContainer().getBoundingClientRect()
+      if (!size.width || !size.height) return
       map.invalidateSize()
       fitRoutes(map, previous.current)
     })
@@ -218,7 +274,19 @@ function MapControls({
 }
 
 export default function RouteMap(props: Props) {
-  const { plan, selectedId, onSelect, hour, heatmap, layer, onCheckpoint } = props
+  const { plan, selectedId, onSelect, hour, heatmap, layer, onCheckpoint, theme } = props
+  const casing = theme === 'dark' ? '#17191a' : '#ffffff'
+  const initialBounds = useMemo(
+    () =>
+      plan
+        ? L.latLngBounds(
+            plan.routes.flatMap((route) =>
+              route.geometry.coordinates.map(([lon, lat]) => [lat, lon] as [number, number]),
+            ),
+          )
+        : undefined,
+    [plan],
+  )
   const sorted = useMemo(
     () =>
       [...(plan?.routes || [])].sort(
@@ -239,128 +307,135 @@ export default function RouteMap(props: Props) {
   )
   return (
     <div className="route-map" aria-label="Trip route and weather map">
-      <MapContainer
-        center={[39.2, -87]}
-        zoom={6}
-        zoomSnap={0.25}
-        zoomControl={false}
-        scrollWheelZoom={true}
-        attributionControl={true}
-      >
-        <TileLayer
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          maxZoom={19}
-        />
-        <Pane name="weather" style={{ zIndex: 350, pointerEvents: 'none' }} />
-        <HeatLayer
-          points={plan?.corridor.points || []}
-          hour={hour}
-          enabled={heatmap}
-          layer={layer}
-        />
-        {sorted.map((route) => {
-          const chosen = route.id === selectedId
-          const positions = positionsById[route.id]
-          return (
-            <Fragment key={route.id}>
-              <Polyline
-                positions={positions}
-                pathOptions={{ color: '#ffffff', weight: chosen ? 8 : 7, opacity: 0.95 }}
-                smoothFactor={1.5}
-              />
-              <Polyline
-                positions={positions}
+      {plan && (
+        <MapContainer
+          bounds={initialBounds}
+          boundsOptions={{
+            paddingTopLeft: [40, window.matchMedia('(max-width: 900px)').matches ? 130 : 90],
+            paddingBottomRight: [65, window.matchMedia('(max-width: 900px)').matches ? 285 : 190],
+            maxZoom: 9,
+          }}
+          zoomSnap={0.25}
+          zoomControl={false}
+          scrollWheelZoom={true}
+          attributionControl={true}
+        >
+          <BasemapTiles />
+          <Pane name="weather" style={{ zIndex: 350, pointerEvents: 'none' }} />
+          <HeatLayer
+            points={plan?.corridor.points || []}
+            hour={hour}
+            enabled={heatmap}
+            layer={layer}
+          />
+          {sorted.map((route) => {
+            const chosen = route.id === selectedId
+            const positions = positionsById[route.id]
+            return (
+              <Fragment key={route.id}>
+                <Polyline
+                  positions={positions}
+                  pathOptions={{ color: casing, weight: chosen ? 9 : 7, opacity: 0.95 }}
+                  smoothFactor={1.5}
+                />
+                <Polyline
+                  positions={positions}
+                  pathOptions={{
+                    color: chosen
+                      ? theme === 'dark'
+                        ? '#b2e8c6'
+                        : '#2d6347'
+                      : theme === 'dark'
+                        ? '#7a8585'
+                        : '#839095',
+                    weight: chosen ? 5 : 3,
+                    opacity: chosen ? 1 : 0.85,
+                  }}
+                  smoothFactor={1.5}
+                  eventHandlers={{ click: () => onSelect(route.id) }}
+                >
+                  <Tooltip sticky>
+                    <strong>
+                      {route.name} · {duration(route.duration_seconds)}
+                    </strong>
+                    <br />
+                    {number(route.distance_miles)} mi · ETA {time(route.arrival)}
+                    <br />
+                    {route.road_name} ·{' '}
+                    {route.summary.eligible
+                      ? plan!.risk_levels[route.summary.max_risk].label
+                      : 'No Travel'}
+                  </Tooltip>
+                </Polyline>
+              </Fragment>
+            )
+          })}
+          {sorted.flatMap((route) =>
+            route.checkpoints.map((p, i) => (
+              <CircleMarker
+                key={`${route.id}-${p.id}`}
+                center={[p.lat, p.lon]}
+                radius={route.id === selectedId ? (p.risk.level >= 2 ? 5.5 : 4) : 3}
                 pathOptions={{
-                  color: chosen ? '#295d4c' : route.id === 'route-2' ? '#9a8eab' : '#8d9ba4',
-                  weight: chosen ? 4.5 : 3.5,
-                  opacity: chosen ? 1 : 0.85,
+                  color: casing,
+                  weight: route.id === selectedId ? 2 : 1.5,
+                  fillColor: COLORS[p.risk.level],
+                  fillOpacity: route.id === selectedId ? 1 : 0.75,
                 }}
-                smoothFactor={1.5}
-                eventHandlers={{ click: () => onSelect(route.id) }}
+                eventHandlers={{
+                  click: () => {
+                    onSelect(route.id)
+                    onCheckpoint(p)
+                  },
+                }}
               >
-                <Tooltip sticky>
+                <Tooltip direction="top">
                   <strong>
-                    {route.name} · {duration(route.duration_seconds)}
+                    {route.name} ·{' '}
+                    {i === 0
+                      ? city(plan!.trip.origin.name)
+                      : i === route.checkpoints.length - 1
+                        ? city(plan!.trip.destination.name)
+                        : `Mile ${number(p.mile)}`}
                   </strong>
                   <br />
-                  {number(route.distance_miles)} mi · ETA {time(route.arrival)}
+                  {time(p.eta)} · {p.risk.label}
                   <br />
-                  {route.road_name} ·{' '}
-                  {route.summary.eligible
-                    ? plan!.risk_levels[route.summary.max_risk].label
-                    : 'No Travel'}
+                  Wind {number(p.weather.wind_mph)} mph · Rain {p.weather.rain_in.toFixed(2)} in/hr
                 </Tooltip>
-              </Polyline>
-            </Fragment>
-          )
-        })}
-        {sorted.flatMap((route) =>
-          route.checkpoints.map((p, i) => (
-            <CircleMarker
-              key={`${route.id}-${p.id}`}
-              center={[p.lat, p.lon]}
-              radius={route.id === selectedId ? (p.risk.level >= 2 ? 5.5 : 4) : 3}
-              pathOptions={{
-                color: '#fff',
-                weight: route.id === selectedId ? 2 : 1.5,
-                fillColor: COLORS[p.risk.level],
-                fillOpacity: route.id === selectedId ? 1 : 0.75,
-              }}
-              eventHandlers={{
-                click: () => {
-                  onSelect(route.id)
-                  onCheckpoint(p)
-                },
-              }}
-            >
-              <Tooltip direction="top">
-                <strong>
-                  {route.name} ·{' '}
-                  {i === 0
-                    ? city(plan!.trip.origin.name)
-                    : i === route.checkpoints.length - 1
-                      ? city(plan!.trip.destination.name)
-                      : `Mile ${number(p.mile)}`}
-                </strong>
-                <br />
-                {time(p.eta)} · {p.risk.label}
-                <br />
-                Wind {number(p.weather.wind_mph)} mph · Rain {p.weather.rain_in.toFixed(2)} in/hr
-              </Tooltip>
-            </CircleMarker>
-          )),
-        )}
-        {plan && (
-          <>
-            <CircleMarker
-              center={[plan.trip.origin.lat, plan.trip.origin.lon]}
-              radius={7}
-              pathOptions={{ color: '#fff', weight: 3, fillColor: '#254f40', fillOpacity: 1 }}
-            >
-              <Tooltip permanent direction="top" className="city-map-label">
-                {city(plan.trip.origin.name)}
-              </Tooltip>
-            </CircleMarker>
-            <CircleMarker
-              center={[plan.trip.destination.lat, plan.trip.destination.lon]}
-              radius={7}
-              pathOptions={{ color: '#fff', weight: 3, fillColor: '#f17a45', fillOpacity: 1 }}
-            >
-              <Tooltip permanent direction="bottom" className="city-map-label">
-                {city(plan.trip.destination.name)}
-              </Tooltip>
-            </CircleMarker>
-          </>
-        )}
-        <MapControls {...props} />
-      </MapContainer>
-      <div className="map-caption">
-        <CloudSun size={17} />
-        <span>Checkpoints: arrival-time weather</span>
-        <span className="caption-dot" />
-        <span>{plan?.mode === 'demo' ? 'Example forecast' : 'Arrival-aware forecasts'}</span>
-      </div>
+              </CircleMarker>
+            )),
+          )}
+          {plan && (
+            <>
+              <CircleMarker
+                center={[plan.trip.origin.lat, plan.trip.origin.lon]}
+                radius={7}
+                pathOptions={{
+                  color: casing,
+                  weight: 3,
+                  fillColor: theme === 'dark' ? '#b2e8c6' : '#254f40',
+                  fillOpacity: 1,
+                }}
+              >
+                <Tooltip permanent direction="top" className="city-map-label">
+                  {city(plan.trip.origin.name)}
+                </Tooltip>
+              </CircleMarker>
+              <CircleMarker
+                center={[plan.trip.destination.lat, plan.trip.destination.lon]}
+                radius={7}
+                pathOptions={{ color: casing, weight: 3, fillColor: '#f17a45', fillOpacity: 1 }}
+              >
+                <Tooltip permanent direction="bottom" className="city-map-label">
+                  {city(plan.trip.destination.name)}
+                </Tooltip>
+              </CircleMarker>
+            </>
+          )}
+          <MapControls {...props} />
+        </MapContainer>
+      )}
     </div>
   )
 }

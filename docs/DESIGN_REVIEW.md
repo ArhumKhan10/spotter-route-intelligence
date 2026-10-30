@@ -1,5 +1,45 @@
 # Visual review
 
+## Current map workspace and themes
+
+The latest revision follows the user's request for a visual interface with
+less text and a complete dark mode. Taste Skill's drawn direction is
+`true-black-flat`, seed 1683639963. The earlier light framed-sheet direction
+was replaced because the user rejected its density and requested dark mode.
+
+The default screen is now the map, with a compact trip panel and three route
+choices. On phones, trip editing is a separate view opened with **Edit trip**.
+The recommendation evidence is available through **Why Route B?**, and the
+full risk rules remain behind Help. No explanatory paragraphs are shown on
+the main map screen. The inspector measured 90 visible words, compared with
+roughly 270 in the previous layout.
+
+Both themes use explicit surface, text, control, and risk-state tokens. Theme
+selection persists across reloads, is applied before React mounts, and sets
+the browser color scheme. Basemap raster tiles receive a separate grayscale
+dark treatment; route lines, checkpoints, and forecast colors keep their
+semantic meaning. Dialogs, city search, errors, saved trips, tables, and
+exports retain their functionality in both themes.
+
+The map is created after its first route is ready and starts at that trip's
+actual bounds. This avoids requesting and canceling an unrelated batch of
+initial map tiles. Only on-screen tile buffers are requested. Screenshots
+wait for the visible basemap tiles to complete loading. A stalled tile is
+retried once after 12 seconds using the same cacheable URL.
+
+The current Taste Skill browser inspector reports **0 FAIL and 0 WARN** at
+1440, 768, and 390px. The main view has no horizontal overflow and keeps all
+UI text at 13px or larger.
+
+Em dashes were removed from app copy and documentation. Regression checks
+cover limited visible copy, on-demand help, dark/light persistence, modal
+surfaces, and the absence of em dashes in the rendered screen and title.
+
+![Dark map workspace](desktop-dark.png)
+![Light map workspace](desktop-light.png)
+
+## Previous design iterations
+
 ## Taste Skill redesign
 
 The official current `design-taste-frontend` skill was installed from

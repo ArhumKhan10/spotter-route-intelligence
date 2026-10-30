@@ -18,6 +18,7 @@ Point out the example label, input panel, three alternatives, map, and timeline.
 Show Chicago to Nashville, departure, 35,000 lb, and 25-mile spacing. Compare
 Route A and recommended Route B. A slightly slower road can win because it
 avoids high weather risk. Open **Compare** and show risk mileage/average risk.
+Open **Why Route B?** to show the evidence on demand.
 
 “No Travel routes are excluded first. Then I compare Severe miles, High
 miles, distance-weighted average risk, and finally driving time. It’s a
@@ -44,8 +45,8 @@ instead of hundreds of HTML elements.”
 
 ## 3:45–4:35 · Load rules and live mode
 
-Change load to 45,000 lb and choose **Refresh** beside the example label.
-Show how the route risk changes. Open methodology and show exact thresholds.
+Change load to 45,000 lb and choose **Refresh demo**.
+Show how the route risk changes. Open **How it works** and show exact thresholds.
 Then click **Find safest route** for live weather. Actual conditions may all
 be low risk. If a public provider fails, show the explicit error and preserved
 example label; do not present simulated data as live.
@@ -68,7 +69,8 @@ behaviors are testable without network calls.”
 Show backend and desktop/mobile test results. Mention threshold boundaries,
 all-routes-blocked behavior, nonuniform road speeds, forecast units/time
 zones, and provider failures. Resize to phone width. Briefly show keyboard
-city selection, saved trips, or JSON export.
+city selection, saved trips, or JSON export. Switch between the sun and moon
+controls, reload to show the saved theme, and use **Edit trip** on the phone.
 
 ## 6:25–7:10 · Tradeoffs and close
 

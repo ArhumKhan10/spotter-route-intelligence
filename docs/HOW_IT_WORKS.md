@@ -8,18 +8,19 @@ load?** It compares road routes; it does not provide turn-by-turn navigation.
 The opening Chicago–Nashville trip uses real roads and **simulated weather**.
 That lets you see why the fastest route might not be recommended.
 
-1. Look at the three route options together under the map.
+1. Look at the three route options beside the map on desktop, or at the bottom
+   of the map on a phone. Use **Edit trip** to open the phone's trip controls.
 2. Route A takes about **8h 51m**, but encounters High-risk weather.
 3. Route B takes about **9h 11m**, with no Severe or High-risk weather miles.
 4. Spotter therefore recommends B. The extra **20 minutes** avoids worse
-   weather in this example. The “Why Route B?” panel shows the evidence.
+   weather in this example. Click **Why Route B?** to open the evidence.
 
 Click a route to highlight it on the map. Click **View trip** for the weather
 checkpoints, or **Compare** for the routes side by side. A colored dot on the
 map is a location where the trip’s expected weather was checked.
 
-Change load weight or checkpoint spacing and click **Refresh example** to
-recalculate the same example scenario. **Load example trip** resets the cities
+Change load weight or checkpoint spacing and click **Refresh demo** to
+recalculate the same example scenario. **Demo trip** resets the cities
 to Chicago and Nashville.
 
 ## Plan with live weather
@@ -32,6 +33,9 @@ to Chicago and Nashville.
    interval checks more locations.
 5. Click **Find safest route**. This fetches real road routes and current weather
    forecasts. The data label changes from example to live.
+
+Use the sun and moon controls in the top-right corner to select light or dark
+mode. Your choice is remembered on this device. Dark mode is the default.
 
 The backend estimates when you will reach each checkpoint and checks that
 hour’s wind gusts, rain, and snow. If a checkpoint is 200 miles away and you are

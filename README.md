@@ -54,6 +54,12 @@ or checkpoint-spacing changes in the example scenario.
 - A map-led dark/light workspace with persistent appearance settings and
   compact route choices. Phone users open trip editing through **Edit trip**.
   Explanations are available on demand.
+- An interactive journey weather strip, accessible with a pointer or keyboard,
+  and a compact recommendation tradeoff against the fastest road.
+- Departure comparisons at the current start, +2 hours, and +4 hours, using the
+  same fetched forecasts and load rules. Applying a time recalculates the trip.
+- Comfortable phone touch targets, text risk labels, and a focused trip-editing
+  sheet that keeps the map visible behind it.
 - JSON trip export and up to five saved trip inputs on the current device.
 - Timeouts, validation, request bounds, provider caching, a basic request
   throttle, and actionable upstream error messages.

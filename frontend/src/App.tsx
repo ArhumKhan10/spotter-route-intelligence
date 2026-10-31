@@ -31,9 +31,13 @@ import RouteMap from './components/RouteMap'
 import RiskBar from './components/RiskBar'
 import Modal from './components/Modal'
 import ThemeSwitch from './components/ThemeSwitch'
+import JourneyWeather from './components/JourneyWeather'
+import RouteComparison from './components/RouteComparison'
+import DepartureComparison from './components/DepartureComparison'
+import { routeTradeoff } from './routeInsights'
 import { useTheme } from './useTheme'
 import { api, city, COLORS, duration, LABELS, localInput, number, time } from './types'
-import type { Checkpoint, Location, Plan, Route } from './types'
+import type { Checkpoint, DepartureOption, Location, Plan, Route } from './types'
 
 const CHICAGO = { name: 'Chicago, IL', lat: 41.8781, lon: -87.6298 }
 const NASHVILLE = { name: 'Nashville, TN', lat: 36.1627, lon: -86.7816 }
@@ -44,7 +48,7 @@ type SavedTrip = {
   interval: number
   savedAt: string
 }
-type ModalName = 'method' | 'compare' | 'details' | 'saved' | 'why' | null
+type ModalName = 'method' | 'compare' | 'details' | 'saved' | 'why' | 'departures' | null
 function readSaved(): SavedTrip[] {
   try {
     return JSON.parse(localStorage.getItem('spotter-trips') || '[]')
@@ -56,6 +60,7 @@ function readSaved(): SavedTrip[] {
 export default function App() {
   const [theme, setTheme] = useTheme()
   const [mobileEditing, setMobileEditing] = useState(false)
+  const [insightTab, setInsightTab] = useState<'route' | 'area'>('route')
   const plannerRef = useRef<HTMLElement>(null)
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const [origin, setOrigin] = useState<Location | null>(CHICAGO)
@@ -78,6 +83,7 @@ export default function App() {
   const request = useRef<AbortController | null>(null)
   const selected = plan?.routes.find((r) => r.id === selectedId)
   const recommended = plan?.routes.find((r) => r.id === plan.recommended_id)
+  const tradeoff = recommended && plan ? routeTradeoff(recommended, plan.routes) : null
   const fastestMinutes = plan
     ? Math.min(...plan.routes.map((r) => Math.round(r.duration_seconds / 60)))
     : 0
@@ -125,6 +131,32 @@ export default function App() {
   const showMap = () => {
     setMobileEditing(false)
     requestAnimationFrame(() => editButtonRef.current?.focus())
+  }
+  const editorKeys = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!mobileEditing) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      showMap()
+      return
+    }
+    if (event.key !== 'Tab') return
+    const controls = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
+      ),
+    ).filter((el) => el.getClientRects().length)
+    const first = controls[0],
+      last = controls[controls.length - 1]
+    if (
+      event.shiftKey &&
+      (document.activeElement === first || document.activeElement === event.currentTarget)
+    ) {
+      event.preventDefault()
+      last?.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first?.focus()
+    }
   }
   useEffect(() => {
     const controller = new AbortController()
@@ -223,6 +255,44 @@ export default function App() {
     setSelectedId(id)
     setCheckpoint(null)
   }
+  const applyDeparture = async (option: DepartureOption) => {
+    if (!plan || !option.available || loading) return
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
+    setLoading(true)
+    setError('')
+    try {
+      const result =
+        plan.mode === 'demo'
+          ? await api<Plan>(
+              `/api/demo/?interval=${plan.trip.interval_miles}&load=${plan.trip.load_lb}&departure=${encodeURIComponent(option.departure)}`,
+              { signal: controller.signal },
+            )
+          : await api<Plan>('/api/plan/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120000)]),
+              body: JSON.stringify({ ...plan.trip, departure: option.departure }),
+            })
+      accept(result)
+      setOrigin(result.trip.origin)
+      setDestination(result.trip.destination)
+      setLoad(String(result.trip.load_lb))
+      setIntervalMiles(result.trip.interval_miles)
+      setDeparture(localInput(new Date(result.trip.departure)))
+      setModal(null)
+      setToast('Departure updated. All routes recalculated.')
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        setError(e instanceof Error ? e.message : 'Unable to update departure.')
+        setModal(null)
+        editTrip()
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoading(false)
+    }
+  }
   const saveTrip = () => {
     if (!plan) return
     const item = {
@@ -259,7 +329,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="topbar">
+      <header className="topbar" inert={mobileEditing}>
         <a className="brand" href="/" aria-label="Spotter home">
           <RoadHorizon size={27} weight="bold" />
           <span>
@@ -300,7 +370,19 @@ export default function App() {
       </header>
 
       <main className={`main-workspace ${mobileEditing ? 'editing-trip' : ''}`}>
-        <aside className="planner-column" aria-label="Trip planner" ref={plannerRef} tabIndex={-1}>
+        {mobileEditing && (
+          <div className="mobile-editor-scrim" aria-hidden="true" onClick={showMap} />
+        )}
+        <aside
+          className="planner-column"
+          aria-label="Trip planner"
+          role={mobileEditing ? 'dialog' : undefined}
+          aria-modal={mobileEditing || undefined}
+          ref={plannerRef}
+          tabIndex={-1}
+          onKeyDown={editorKeys}
+        >
+          <span className="sheet-handle" aria-hidden="true" />
           <div className="planner-heading">
             {mobileEditing ? <h1>Plan a trip</h1> : <h2>Plan a trip</h2>}
             <button className="mobile-close icon-button" aria-label="Back to map" onClick={showMap}>
@@ -469,6 +551,7 @@ export default function App() {
                     route={route}
                     selected={selectedId === route.id}
                     recommended={plan.recommended_id === route.id}
+                    tradeoff={plan.recommended_id === route.id ? tradeoff : null}
                     onSelect={() => select(route.id)}
                   />
                 ))
@@ -500,7 +583,7 @@ export default function App() {
           </div>
         </aside>
 
-        <section className="map-panel" aria-label="Route overview">
+        <section className="map-panel" aria-label="Route overview" inert={mobileEditing}>
           <RouteMap
             plan={plan}
             selectedId={selectedId}
@@ -588,112 +671,195 @@ export default function App() {
               </div>
             )
           )}
-          <div className="mobile-routes">
-            <div className="mobile-routes-heading">
-              <span>Routes</span>
-              {recommended && (
-                <button
-                  className="mobile-why"
-                  aria-label={`Why ${recommended.name}?`}
-                  title={`Why ${recommended.name}?`}
-                  onClick={() => setModal('why')}
-                >
-                  <Info size={14} />
+          <div className="map-dock">
+            <div className="mobile-routes">
+              <div className="mobile-routes-heading">
+                <span>Routes</span>
+                {recommended && (
+                  <button
+                    className="mobile-why"
+                    aria-label={`Why ${recommended.name}?`}
+                    title={`Why ${recommended.name}?`}
+                    onClick={() => setModal('why')}
+                  >
+                    <Info size={14} />
+                  </button>
+                )}
+                <button onClick={() => setModal('compare')}>
+                  Compare <ArrowUpRight size={12} />
                 </button>
+              </div>
+              <div className="mobile-route-list">
+                {plan?.routes.map((route) => (
+                  <button
+                    key={route.id}
+                    className={route.id === selectedId ? 'selected' : ''}
+                    aria-pressed={route.id === selectedId}
+                    aria-label={`${route.name}, ${plan.recommended_id === route.id ? 'recommended, ' : ''}${duration(route.duration_seconds)}, ${number(route.distance_miles)} miles`}
+                    onClick={() => select(route.id)}
+                  >
+                    <span className="mobile-route-name">
+                      {route.name}
+                      {route.id === plan.recommended_id && <Check size={12} />}
+                    </span>
+                    <strong>{duration(route.duration_seconds)}</strong>
+                    <span className={`route-chip-risk-label risk-${route.summary.max_risk}`}>
+                      {LABELS[route.summary.max_risk]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {selectedId === recommended?.id && tradeoff && (
+                <p className="mobile-tradeoff" title={tradeoff.baseline}>
+                  {tradeoff.text}
+                </p>
               )}
-              <button onClick={() => setModal('compare')}>
-                Compare <ArrowUpRight size={12} />
-              </button>
             </div>
-            <div className="mobile-route-list">
-              {plan?.routes.map((route) => (
-                <button
-                  key={route.id}
-                  className={route.id === selectedId ? 'selected' : ''}
-                  aria-pressed={route.id === selectedId}
-                  aria-label={`${route.name}, ${plan.recommended_id === route.id ? 'recommended, ' : ''}${duration(route.duration_seconds)}, ${number(route.distance_miles)} miles`}
-                  onClick={() => select(route.id)}
-                >
-                  <span className="mobile-route-name">
-                    {route.name}
-                    {route.id === plan.recommended_id && <Check size={12} />}
-                  </span>
-                  <strong>{duration(route.duration_seconds)}</strong>
-                  <span
-                    className="route-chip-risk"
-                    style={{ background: COLORS[route.summary.max_risk] }}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="forecast-panel">
-            <div className="forecast-heading">
-              <div>
-                <CloudSun size={16} />
-                <strong>Forecast</strong>
-                <span className="forecast-time">{plan && time(plan.corridor.times[hour])}</span>
-              </div>
-              <div className="forecast-heading-right">
-                <span className="hour-offset">+{hour}h</span>
-                <button
-                  className="forecast-info"
-                  aria-label="About forecast slider"
-                  title="Area weather preview. Route rankings use each checkpoint's arrival time."
-                  onClick={() => setModal('method')}
-                >
-                  <Info size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="forecast-control">
-              <button
-                className="play-button"
-                aria-label={playing ? 'Pause forecast' : 'Play forecast'}
-                onClick={() => setPlaying(!playing)}
-                disabled={!plan}
+            <div className="map-insights">
+              <div
+                className="insight-tabs"
+                role="tablist"
+                aria-label="Weather view"
+                onKeyDown={(event) => {
+                  if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                    event.preventDefault()
+                    const next =
+                      event.key === 'Home'
+                        ? 'route'
+                        : event.key === 'End'
+                          ? 'area'
+                          : insightTab === 'route'
+                            ? 'area'
+                            : 'route'
+                    setInsightTab(next)
+                    document.getElementById(`weather-tab-${next}`)?.focus()
+                    if (next === 'route') setPlaying(false)
+                  }
+                }}
               >
-                {playing ? <Pause size={15} weight="fill" /> : <Play size={15} weight="fill" />}
-              </button>
-              <div className="slider-wrap">
-                <input
-                  type="range"
-                  min="0"
-                  max="48"
-                  step="1"
-                  value={hour}
-                  aria-label="Forecast hours ahead"
-                  aria-valuetext={`${hour} hours ahead`}
-                  onChange={(e) => {
-                    setHour(Number(e.target.value))
+                <button
+                  role="tab"
+                  id="weather-tab-route"
+                  aria-controls="weather-panel-route"
+                  aria-selected={insightTab === 'route'}
+                  tabIndex={insightTab === 'route' ? 0 : -1}
+                  onClick={() => {
+                    setInsightTab('route')
                     setPlaying(false)
                   }}
-                  disabled={!plan}
-                />
-                <div className="slider-labels">
-                  {[0, 12, 24, 36, 48].map((value) => (
+                >
+                  Along route
+                </button>
+                <button
+                  role="tab"
+                  id="weather-tab-area"
+                  aria-controls="weather-panel-area"
+                  aria-selected={insightTab === 'area'}
+                  tabIndex={insightTab === 'area' ? 0 : -1}
+                  onClick={() => setInsightTab('area')}
+                >
+                  Area forecast
+                </button>
+                <span className="insight-route-name">{selected?.name}</span>
+              </div>
+              <div
+                id="weather-panel-route"
+                role="tabpanel"
+                aria-labelledby="weather-tab-route"
+                hidden={insightTab !== 'route'}
+              >
+                {selected && (
+                  <JourneyWeather
+                    key={selected.id}
+                    route={selected}
+                    active={checkpoint}
+                    onCheckpoint={setCheckpoint}
+                    onDepartures={() => setModal('departures')}
+                  />
+                )}
+              </div>
+              <div
+                id="weather-panel-area"
+                role="tabpanel"
+                aria-labelledby="weather-tab-area"
+                hidden={insightTab !== 'area'}
+              >
+                <div className="forecast-panel">
+                  <div className="forecast-heading">
+                    <div>
+                      <CloudSun size={16} />
+                      <strong>Forecast</strong>
+                      <span className="forecast-time">
+                        {plan && time(plan.corridor.times[hour])}
+                      </span>
+                    </div>
+                    <div className="forecast-heading-right">
+                      <span className="hour-offset">+{hour}h</span>
+                      <button
+                        className="forecast-info"
+                        aria-label="About forecast slider"
+                        title="Area weather preview. Route rankings use each checkpoint's arrival time."
+                        onClick={() => setModal('method')}
+                      >
+                        <Info size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="forecast-control">
                     <button
-                      key={value}
-                      onClick={() => {
-                        setHour(value)
-                        setPlaying(false)
-                      }}
-                      className={value === hour ? 'active' : ''}
+                      className="play-button"
+                      aria-label={playing ? 'Pause forecast' : 'Play forecast'}
+                      onClick={() => setPlaying(!playing)}
+                      disabled={!plan}
                     >
-                      {value === 0 ? 'Now' : `+${value}h`}
+                      {playing ? (
+                        <Pause size={15} weight="fill" />
+                      ) : (
+                        <Play size={15} weight="fill" />
+                      )}
                     </button>
-                  ))}
+                    <div className="slider-wrap">
+                      <input
+                        type="range"
+                        min="0"
+                        max="48"
+                        step="1"
+                        value={hour}
+                        aria-label="Forecast hours ahead"
+                        aria-valuetext={`${hour} hours ahead`}
+                        onChange={(e) => {
+                          setHour(Number(e.target.value))
+                          setPlaying(false)
+                        }}
+                        disabled={!plan}
+                      />
+                      <div className="slider-labels">
+                        {[0, 12, 24, 36, 48].map((value) => (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              setHour(value)
+                              setPlaying(false)
+                            }}
+                            className={value === hour ? 'active' : ''}
+                          >
+                            {value === 0 ? 'Now' : `+${value}h`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="risk-legend" aria-label={legendTitle}>
-            {legendLabels.map((label, i) => (
-              <span key={label}>
-                <i style={{ background: COLORS[i] }} />
-                {label}
-              </span>
-            ))}
+            <div className="risk-legend" aria-label={legendTitle}>
+              {legendLabels.map((label, i) => (
+                <span key={label}>
+                  <i style={{ background: COLORS[i] }} />
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
       </main>
@@ -710,18 +876,28 @@ export default function App() {
           title={
             modal === 'why'
               ? `Why ${recommended?.name || 'this route'}?`
-              : modal === 'method'
-                ? 'How Spotter chooses a route'
-                : modal === 'compare'
-                  ? 'Compare route weather'
-                  : modal === 'saved'
-                    ? 'Your saved trips.'
-                    : `${selected?.name || 'Trip'} · Weather checkpoints`
+              : modal === 'departures'
+                ? 'Choose when to leave'
+                : modal === 'method'
+                  ? 'How Spotter chooses a route'
+                  : modal === 'compare'
+                    ? 'Compare route weather'
+                    : modal === 'saved'
+                      ? 'Your saved trips.'
+                      : `${selected?.name || 'Trip'} · Weather checkpoints`
           }
           onClose={() => setModal(null)}
-          wide={modal === 'compare' || modal === 'details'}
+          wide={modal === 'compare' || modal === 'details' || modal === 'departures'}
         >
           {modal === 'method' && <Method />}
+          {modal === 'departures' && selected && (
+            <DepartureComparison
+              route={selected}
+              demo={plan?.mode === 'demo'}
+              loading={loading}
+              onApply={applyDeparture}
+            />
+          )}
           {modal === 'why' && recommended && (
             <section className="recommendation-evidence" aria-label="Recommendation explanation">
               <h3>{recommended.name} is recommended</h3>
@@ -750,74 +926,15 @@ export default function App() {
               </button>
             </section>
           )}
-          {modal === 'compare' &&
-            (plan ? (
-              <>
-                <p className="modal-intro">
-                  Routes are ranked by severe miles, high miles, average risk, then driving time.
-                  Any No Travel condition excludes a route.
-                </p>
-                <div className="comparison-grid">
-                  {plan.routes.map((route) => (
-                    <div
-                      className={`comparison-route ${route.id === plan.recommended_id ? 'best' : ''}`}
-                      key={route.id}
-                    >
-                      <span className="comparison-label">
-                        {route.id === plan.recommended_id ? (
-                          <>
-                            <ShieldCheck size={15} />
-                            Recommended
-                          </>
-                        ) : !route.summary.eligible ? (
-                          'No Travel'
-                        ) : (
-                          'Alternative'
-                        )}
-                      </span>
-                      <h3>{route.name}</h3>
-                      <p>{route.road_name}</p>
-                      <strong>{duration(route.duration_seconds)}</strong>
-                      <span>
-                        {number(route.distance_miles)} miles · {route.checkpoints.length}{' '}
-                        checkpoints
-                      </span>
-                      <RiskBar route={route} large />
-                      <dl>
-                        {LABELS.map((label, i) => (
-                          <div key={label}>
-                            <dt>
-                              <i style={{ background: COLORS[i] }} />
-                              {label}
-                            </dt>
-                            <dd>{route.summary.risk_miles[i].toFixed(1)} mi</dd>
-                          </div>
-                        ))}
-                        <div>
-                          <dt>Average risk</dt>
-                          <dd>{route.summary.average_risk.toFixed(2)} / 4</dd>
-                        </div>
-                      </dl>
-                      <button
-                        className="primary"
-                        onClick={() => {
-                          select(route.id)
-                          setModal(null)
-                        }}
-                      >
-                        View this route <ArrowRight size={15} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <p className="small-note">
-                  Miles between checkpoints inherit the higher risk of their two endpoints. This is
-                  an estimate between samples.
-                </p>
-              </>
-            ) : (
-              <p>Plan a trip to compare routes.</p>
-            ))}
+          {modal === 'compare' && plan && (
+            <RouteComparison
+              plan={plan}
+              onSelect={(id) => {
+                select(id)
+                setModal(null)
+              }}
+            />
+          )}
           {modal === 'details' && selected && (
             <>
               <div className="detail-overview">
@@ -982,11 +1099,13 @@ function RouteCard({
   selected,
   recommended,
   onSelect,
+  tradeoff,
 }: {
   route: Route
   selected: boolean
   recommended: boolean
   onSelect: () => void
+  tradeoff?: ReturnType<typeof routeTradeoff>
 }) {
   return (
     <button
@@ -1021,6 +1140,11 @@ function RouteCard({
         <ArrowUpRight size={15} />
       </div>
       <RiskBar route={route} />
+      {tradeoff && (
+        <span className="route-tradeoff" title={tradeoff.baseline}>
+          {tradeoff.text}
+        </span>
+      )}
     </button>
   )
 }

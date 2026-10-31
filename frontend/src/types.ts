@@ -17,6 +17,17 @@ export type Checkpoint = {
   weather: Weather
   risk: Risk
 }
+export type RouteSummary = {
+  risk_miles: number[]
+  average_risk: number
+  max_risk: number
+  eligible: boolean
+}
+export type DepartureOption = {
+  offset_hours: number
+  departure: string
+  arrival: string
+} & ({ available: true; summary: RouteSummary } | { available: false; reason: string })
 export type Route = {
   id: string
   name: string
@@ -27,7 +38,8 @@ export type Route = {
   duration_seconds: number
   arrival: string
   checkpoints: Checkpoint[]
-  summary: { risk_miles: number[]; average_risk: number; max_risk: number; eligible: boolean }
+  summary: RouteSummary
+  departures?: DepartureOption[]
 }
 export type CorridorHour = { risk: number; wind_mph: number; rain_in: number; snow_in: number }
 export type CorridorPoint = { lat: number; lon: number; hours: CorridorHour[] }

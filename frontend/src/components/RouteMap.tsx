@@ -124,7 +124,7 @@ function fitRoutes(map: L.Map, plan: Plan | null, animate = false) {
   )
   map.fitBounds(L.latLngBounds(coords), {
     paddingTopLeft: [40, window.matchMedia('(max-width: 900px)').matches ? 130 : 90],
-    paddingBottomRight: [65, window.matchMedia('(max-width: 900px)').matches ? 285 : 190],
+    paddingBottomRight: [65, window.matchMedia('(max-width: 900px)').matches ? 380 : 280],
     maxZoom: 9,
     animate: animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   })
@@ -312,7 +312,7 @@ export default function RouteMap(props: Props) {
           bounds={initialBounds}
           boundsOptions={{
             paddingTopLeft: [40, window.matchMedia('(max-width: 900px)').matches ? 130 : 90],
-            paddingBottomRight: [65, window.matchMedia('(max-width: 900px)').matches ? 285 : 190],
+            paddingBottomRight: [65, window.matchMedia('(max-width: 900px)').matches ? 380 : 280],
             maxZoom: 9,
           }}
           zoomSnap={0.25}

@@ -66,6 +66,7 @@ test('example trip, route comparison, checkpoint and export', async ({ page }) =
 })
 
 test('forecast slider, layers and overlay', async ({ page }) => {
+  await page.getByRole('tab', { name: 'Area forecast', exact: true }).click()
   const slider = page.getByRole('slider', { name: 'Forecast hours ahead' })
   await slider.fill('24')
   await expect(slider).toHaveValue('24')
@@ -107,7 +108,138 @@ test('keyboard city search, load and checkpoint spacing', async ({ page }) => {
     'aria-pressed',
     'true',
   )
+  if ((page.viewportSize()?.width || 1440) <= 900) {
+    await expect(page.locator('.planner-column .route-options')).toBeHidden()
+    await page.getByRole('button', { name: 'Back to map', exact: true }).click()
+  }
   await expect(page.getByRole('button', { name: /Route B, recommended/ })).toBeVisible()
+})
+
+test('recommendation tradeoff stays compact and names its baseline', async ({ page }) => {
+  const tradeoff = page.locator('.route-tradeoff:visible, .mobile-tradeoff:visible')
+  await expect(tradeoff).toHaveText('+20 min vs A · 75 High mi avoided')
+  await expect(tradeoff).toHaveAttribute('title', /Route A, the fastest road/)
+})
+
+test('journey weather supports keyboard inspection without changing area time', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: /Route A, / }).click()
+  const profile = page.getByRole('slider', { name: 'Arrival weather along selected route' })
+  await profile.focus()
+  await profile.press('ArrowRight')
+  await expect(profile).toHaveAttribute('aria-valuenow', '25')
+  await expect(page.locator('.checkpoint-popup')).toContainText('Mile 25.0')
+  await profile.press('End')
+  await expect(profile).toHaveAttribute('aria-valuenow', '468')
+  await expect(profile).toHaveAttribute('aria-valuetext', /arriving/)
+  await page.getByRole('button', { name: 'Close checkpoint', exact: true }).click()
+  await page.getByRole('tab', { name: 'Area forecast', exact: true }).click()
+  await page.getByRole('slider', { name: 'Forecast hours ahead' }).fill('24')
+  await page.getByRole('tab', { name: 'Along route', exact: true }).click()
+  await expect(profile).toHaveAttribute('aria-valuenow', '468')
+  await expect(page.getByRole('button', { name: /Route A, / })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+})
+
+test('comparison emphasizes differences and reveals shared zero bands on demand', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Compare', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.locator('dt').filter({ hasText: 'No Travel' })).toHaveCount(0)
+  await expect(dialog.locator('.comparison-difference')).toHaveCount(9)
+  await page.getByRole('button', { name: 'Show all risk bands', exact: true }).click()
+  await expect(dialog.locator('dt').filter({ hasText: 'No Travel' })).toHaveCount(3)
+  await page.getByRole('button', { name: 'Hide shared zeros', exact: true }).click()
+  await expect(dialog.locator('dt').filter({ hasText: 'No Travel' })).toHaveCount(0)
+})
+
+test('departure comparison applies a later time and recalculates the demo', async ({ page }) => {
+  await page.getByRole('button', { name: 'Departure times', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('Simulated weather')
+  await expect(page.getByRole('row')).toHaveCount(4)
+  const response = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/demo/') &&
+      response.url().includes('departure=') &&
+      response.ok(),
+  )
+  await page.getByRole('button', { name: 'Plan departure 2 hours later', exact: true }).click()
+  const updated = await (await response).json()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('.toast')).toContainText('Departure updated')
+  await expect(page.locator('.map-mode')).toHaveText('Demo')
+  await openTrip(page)
+  const actual = await page.locator('#departure').inputValue()
+  expect(new Date(actual).getTime()).toBe(new Date(updated.trip.departure).getTime())
+})
+
+test('phone targets are comfortable and the editor preserves the map context', async ({ page }) => {
+  if ((page.viewportSize()?.width || 1440) > 900) return
+  for (const name of [
+    'Saved trips',
+    'How it works',
+    'Light mode',
+    'Dark mode',
+    'Zoom in',
+    'Zoom out',
+    'Fit all routes',
+    'Save current trip',
+    'Why Route B?',
+  ]) {
+    const bounds = await page.getByRole('button', { name, exact: true }).boundingBox()
+    expect(bounds?.width, name).toBeGreaterThanOrEqual(44)
+    expect(bounds?.height, name).toBeGreaterThanOrEqual(44)
+  }
+  await expect(page.locator('.route-chip-risk-label')).toHaveText(['High', 'Low', 'Moderate'])
+  await openTrip(page)
+  await expect(page.getByRole('dialog', { name: 'Trip planner' })).toBeVisible()
+  await expect(page.locator('.planner-column .route-options')).toBeHidden()
+  await expect(page.locator('.leaflet-container')).toBeVisible()
+  const editor = await page.locator('.planner-column').boundingBox()
+  expect(editor!.y).toBeGreaterThan(100)
+  await page.getByRole('button', { name: 'Back to map', exact: true }).focus()
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.getByRole('button', { name: 'Refresh demo', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Back to map', exact: true })).toBeFocused()
+  await page.locator('#load').focus()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Trip planner' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit trip', exact: true })).toBeFocused()
+})
+
+test('departure comparison distinguishes unavailable weather from No Travel', async ({ page }) => {
+  await page.route('**/api/demo/', async (route) => {
+    const response = await route.fetch()
+    const plan = await response.json()
+    for (const road of plan.routes) {
+      road.departures[1] = {
+        ...road.departures[1],
+        available: false,
+        reason: 'Forecast unavailable for this arrival.',
+      }
+      delete road.departures[1].summary
+      road.departures[2].summary = {
+        risk_miles: [0, 0, 0, 0, road.distance_miles],
+        eligible: false,
+        max_risk: 4,
+        average_risk: 4,
+      }
+    }
+    await route.fulfill({ response, json: plan })
+  })
+  await page.reload()
+  await page.getByRole('button', { name: 'Departure times', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('Forecast unavailable for this arrival.')
+  await expect(
+    page.getByRole('button', { name: 'Plan departure 2 hours later', exact: true }),
+  ).toBeDisabled()
+  await expect(page.getByRole('dialog').getByText('No Travel', { exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog')).not.toContainText('same ranked weather exposure')
 })
 
 test('live provider failures retain explicitly labeled results', async ({ page }) => {

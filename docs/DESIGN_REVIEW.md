@@ -1,6 +1,51 @@
 # Visual review
 
-## Current map workspace and themes
+## Current route insights and phone improvements
+
+The accepted improvement pass keeps the existing Taste Skill `true-black-flat`
+direction, seed 1683639963, and the shared light/dark tokens. No style redraw
+was needed. The new signature is a thin journey weather strip drawn from actual
+checkpoint intervals, with a compact recommendation tradeoff against the fastest
+road. The strip supports pointer inspection and keyboard navigation.
+
+The map stays visible behind the phone's focused trip-editing sheet. Its repeated
+route list is removed, primary map/header controls have 44px targets, and route
+risk has visible text labels. Focus remains inside the sheet until it closes,
+then returns to Edit trip. The area forecast lives in a separate tab from
+arrival-time weather. Comparison hides shared zero bands behind a real control.
+
+Departure comparison is an on-demand dialog. Current, +2 hour, and +4 hour starts
+are evaluated with the same already fetched weather and load rules. Missing
+forecasts and out-of-window starts remain explicit. Applying a time recalculates
+all roads without changing simulated weather into live weather.
+
+Taste Skill's browser inspector reports **0 FAIL and 0 WARN** at 1440, 768, and
+390px, with 113 desktop words and 67 phone words. There is no horizontal overflow
+and UI type stays at 13px or above. The source linter's six shadow warnings refer
+to actual floating menus, tooltips, popovers, dialogs, toasts, and the phone sheet.
+
+Visual review caught overlap between the larger insights panel and View trip,
+and between the phone's area forecast and Layers. The trip summary now sits
+under the map's city context, and Layers is beside the phone's zoom controls.
+
+App-screen critique: the map answers which road to choose and remains the
+largest element. Sidebar and comparison edges align, and the phone receives
+its own form sheet. Color identifies road selection, weather severity, or
+status. The displayed 20-minute delta is 551 minus 531 rounded driving minutes;
+the 75 High-mile benefit is 75 minus zero on the same baseline road. Risk-mile
+totals come from checkpoint intervals. Shared zeros can be revealed, while
+unavailable future weather has a reason instead of a zero. Legends retain their
+units and weather marks; the phone has text risk labels. The final review found
+no overlapping main controls after the two placement fixes. Dense geographic
+labels remain part of the real basemap rather than invented interface content.
+The phone tradeoff has an opaque theme surface so basemap labels do not run
+behind its text in light mode.
+
+![Interactive journey weather](journey-weather.png)
+![Departure comparison](departure-comparison.png)
+![Focused phone editor](mobile-editor.png)
+
+## Map workspace and theme foundation
 
 The latest revision follows the user's request for a visual interface with
 less text and a complete dark mode. Taste Skill's drawn direction is

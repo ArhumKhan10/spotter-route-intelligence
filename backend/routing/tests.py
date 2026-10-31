@@ -8,8 +8,8 @@ from .errors import PlanningError
 from .risk import classify, summarize, recommend
 from .sampling import sample_route, METERS_PER_MILE
 from .validation import validate_plan
-from .service import weather_at
-from .demo import example_plan
+from .service import weather_at, assess_checkpoints, departure_choices, build_plan
+from .demo import example_plan, example_forecasts
 
 NOW = datetime(2026, 10, 30, 12, tzinfo=timezone.utc)
 
@@ -197,6 +197,15 @@ class ApiTests(SimpleTestCase):
         self.assertEqual(response.json()['trip']['interval_miles'], 50)
         self.assertEqual(self.client.get('/api/demo/?interval=11').status_code, 400)
 
+    def test_demo_accepts_selected_departure_and_validates_window(self):
+        departure = (datetime.now(timezone.utc) + timedelta(hours=3)).replace(microsecond=0).isoformat()
+        response = self.client.get('/api/demo/', {'departure': departure})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['trip']['departure'], departure)
+        self.assertEqual(self.client.get('/api/demo/', {'departure': 'invalid'}).status_code, 400)
+        beyond = (datetime.now(timezone.utc) + timedelta(hours=51)).isoformat()
+        self.assertEqual(self.client.get('/api/demo/', {'departure': beyond}).status_code, 400)
+
     def test_demo_full_pipeline(self):
         plan = example_plan()
         self.assertEqual(len(plan['routes']), 3)
@@ -212,3 +221,68 @@ class ApiTests(SimpleTestCase):
                 self.assertIn(point['risk']['level'], range(5))
         for point in plan['corridor']['points']:
             self.assertEqual(len(point['hours']), 49)
+
+
+class DepartureTests(SimpleTestCase):
+    def setUp(self):
+        self.points = [
+            {'id': i, 'lat': 40, 'lon': -86, 'mile': i * 50, 'elapsed_seconds': i * 3600,
+             'eta': (NOW + timedelta(hours=1+i)).isoformat()}
+            for i in range(2)]
+        self.hourly = {
+            'time': [int((NOW + timedelta(hours=i)).timestamp()) for i in range(12)],
+            'wind_gusts_10m': [20, 20, 20, 40, 40, 55, 55, 55, 55, 55, 55, 55],
+            'rain': [0]*12, 'showers': [0]*12, 'snowfall': [0]*12, 'temperature_2m': [60]*12}
+        self.forecasts = {(40, -86): self.hourly}
+        self.params = {'departure': NOW + timedelta(hours=1), 'load_lb': 45000}
+        points = assess_checkpoints(self.points, self.forecasts, 45000)
+        self.route = {'checkpoints': points, 'duration_seconds': 3600,
+                      'distance_miles': 50, 'summary': summarize(points, 50)}
+
+    def test_shift_uses_arrival_forecast_and_same_load_rules(self):
+        choices = departure_choices(self.route, self.params, self.forecasts, NOW)
+        self.assertEqual([c['summary']['max_risk'] for c in choices], [0, 3, 4])
+        self.assertEqual([c['summary']['eligible'] for c in choices], [True, True, False])
+        self.assertEqual(choices[1]['summary']['risk_miles'][3], 50)
+        self.assertEqual(choices[2]['summary']['risk_miles'][4], 50)
+        self.assertEqual(datetime.fromisoformat(choices[1]['arrival']) - datetime.fromisoformat(choices[1]['departure']), timedelta(hours=1))
+
+    def test_comparison_does_not_mutate_current_checkpoints(self):
+        before = json.dumps(self.route, sort_keys=True)
+        departure_choices(self.route, self.params, self.forecasts, NOW)
+        self.assertEqual(json.dumps(self.route, sort_keys=True), before)
+
+    def test_missing_later_weather_is_unavailable_not_low_risk(self):
+        self.hourly['wind_gusts_10m'][3] = None
+        choices = departure_choices(self.route, self.params, self.forecasts, NOW)
+        self.assertTrue(choices[0]['available'])
+        self.assertFalse(choices[1]['available'])
+        self.assertNotIn('summary', choices[1])
+        self.assertIn('incomplete', choices[1]['reason'])
+
+    def test_later_arrival_outside_forecast_is_unavailable(self):
+        for field in self.hourly:
+            self.hourly[field] = self.hourly[field][:3]
+        choices = departure_choices(self.route, self.params, self.forecasts, NOW)
+        self.assertEqual([c['available'] for c in choices], [True, False, False])
+
+    def test_departure_window_is_enforced_for_comparisons(self):
+        self.params['departure'] = NOW + timedelta(hours=47)
+        choices = departure_choices(self.route, self.params, self.forecasts, NOW)
+        self.assertEqual([c['available'] for c in choices], [True, False, False])
+        self.assertIn('48-hour', choices[1]['reason'])
+
+    def test_all_options_share_one_forecast_fetch(self):
+        from unittest.mock import Mock
+        raw = json.loads(Path(__file__).with_name('fixtures').joinpath('example_routes.json').read_text())
+        params = payload()
+        params['departure'] = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        fetch = Mock(side_effect=example_forecasts)
+        plan = build_plan(params, raw_routes=raw, forecast_fn=fetch, mode='demo')
+        self.assertEqual(fetch.call_count, 1)
+        for route in plan['routes']:
+            self.assertEqual(len(route['departures']), 3)
+            self.assertEqual(route['departures'][0]['summary'], route['summary'])
+            for choice in route['departures']:
+                if choice['available']:
+                    self.assertAlmostEqual(sum(choice['summary']['risk_miles']), route['distance_miles'])

@@ -13,11 +13,16 @@ That lets you see why the fastest route might not be recommended.
 2. Route A takes about **8h 51m**, but encounters High-risk weather.
 3. Route B takes about **9h 11m**, with no Severe or High-risk weather miles.
 4. Spotter therefore recommends B. The extra **20 minutes** avoids worse
-   weather in this example. Click **Why Route B?** to open the evidence.
+   weather in this example. Its compact tradeoff names Route A as the baseline
+   and shows **75 High-risk miles avoided**. Click **Why Route B?** for details.
 
 Click a route to highlight it on the map. Click **View trip** for the weather
 checkpoints, or **Compare** for the routes side by side. A colored dot on the
 map is a location where the trip’s expected weather was checked.
+
+**Compare** emphasizes weather differences. Shared zero-mile bands are hidden;
+choose **Show all risk bands** to inspect them too. On a phone, **Edit trip**
+opens a form sheet over the map. Close it with the X, Escape, or the backdrop.
 
 Change load weight or checkpoint spacing and click **Refresh demo** to
 recalculate the same example scenario. **Demo trip** resets the cities
@@ -58,12 +63,30 @@ recommends none of them.
 
 ## What the slider changes
 
-The 0–48 hour slider shows weather across the area at **one selected time**.
+**Along route** is the opening view. Its colored strip follows the actual road
+distance and uses the worse risk at each pair of checkpoints, matching risk-mile
+calculations. Hover to preview weather, or click to inspect a checkpoint on the
+map. Keyboard users can focus the strip and use arrows, Home, End, or Page keys.
+
+Switch to **Area forecast** for the 0–48 hour slider. It shows weather across
+the area at **one selected time**.
 It changes the colored area overlay. It **does not change the route ranking**:
 that ranking still follows the truck’s arrival time at each checkpoint.
 
 Think of the slider as a weather preview, and the route cards as the trip’s
 weather assessment. Use **Layers** to preview wind, rain, snow, or combined risk.
+
+## Compare departure times
+
+Choose **Departure times** under **Along route**. Spotter compares the selected
+road and load at the current start, two hours later, and four hours later.
+It reuses the same fetched forecasts and checks the shifted arrival at every
+checkpoint. The table shows Severe/High mileage, average risk, and arrival time.
+
+Later is not automatically better. Missing forecasts and starts beyond the
+48-hour window are marked unavailable. No Travel remains explicit. **Use time**
+recalculates all roads for that start; the recommendation can change. Demo trips
+continue using clearly labeled simulated weather.
 
 ## What to remember in the interview
 

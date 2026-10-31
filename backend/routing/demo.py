@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from .service import build_plan
+from .validation import validate_plan
 
 
 def example_forecasts(points):
@@ -26,11 +27,11 @@ def example_forecasts(points):
     return result
 
 
-def example_plan(interval=25, load=35000):
+def example_plan(interval=25, load=35000, departure=None):
     fixture = Path(__file__).parent / 'fixtures' / 'example_routes.json'
     raw = json.loads(fixture.read_text(encoding='utf-8'))
-    params = {'origin': {'name': 'Chicago, IL', 'lat': 41.8781, 'lon': -87.6298},
+    params = validate_plan({'origin': {'name': 'Chicago, IL', 'lat': 41.8781, 'lon': -87.6298},
               'destination': {'name': 'Nashville, TN', 'lat': 36.1627, 'lon': -86.7816},
-              'departure': datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)+timedelta(hours=1),
-              'load_lb': load, 'interval_miles': interval}
+              'departure': departure or (datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)+timedelta(hours=1)).isoformat(),
+              'load_lb': load, 'interval_miles': interval})
     return build_plan(params, raw_routes=raw, forecast_fn=example_forecasts, mode='demo')

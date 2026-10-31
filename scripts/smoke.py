@@ -33,5 +33,12 @@ with httpx.Client(base_url=base, timeout=120, follow_redirects=True) as client:
     assert data['mode'] == 'live' and len(data['routes']) == 3
     for route in data['routes']:
         assert abs(sum(route['summary']['risk_miles'])-route['distance_miles']) < .01
+        assert [choice['offset_hours'] for choice in route['departures']] == [0, 2, 4]
+        assert route['departures'][0]['summary'] == route['summary']
+        for choice in route['departures']:
+            if choice['available']:
+                assert abs(sum(choice['summary']['risk_miles'])-route['distance_miles']) < .01
+            else:
+                assert choice['reason'] and 'summary' not in choice
     print(f'Live routing + weather: {len(data["routes"])} routes, {sum(len(r["checkpoints"]) for r in data["routes"])} checkpoints, {len(data["corridor"]["points"])} corridor samples, OK')
     print('Hosted smoke checks passed.')

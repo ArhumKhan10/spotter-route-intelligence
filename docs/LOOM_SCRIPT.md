@@ -19,6 +19,8 @@ Show Chicago to Nashville, departure, 35,000 lb, and 25-mile spacing. Compare
 Route A and recommended Route B. A slightly slower road can win because it
 avoids high weather risk. Open **Compare** and show risk mileage/average risk.
 Open **Why Route B?** to show the evidence on demand.
+Point out the compact 20-minute / 75 High-mile tradeoff. In comparison, reveal
+shared zero bands with **Show all risk bands**.
 
 “No Travel routes are excluded first. Then I compare Severe miles, High
 miles, distance-weighted average risk, and finally driving time. It’s a
@@ -28,6 +30,7 @@ lexicographic ranking rather than a hidden weighted score.”
 
 Open **View trip** and show ETAs, wind gusts, rain, snow, and risk in the
 checkpoint table. Open a checkpoint on the map.
+Show **Along route** and inspect the weather strip with a click or arrow key.
 
 “Arrival times integrate road-segment durations rather than assuming the
 truck travels at the same speed everywhere. I include origin and destination
@@ -35,7 +38,7 @@ even when the last interval is shorter.”
 
 ## 2:50–3:45 · Forecast heatmap
 
-Move the slider to +12, +24, and +48 hours. Play/pause, select wind/rain
+Switch to **Area forecast**. Move the slider to +12, +24, and +48 hours. Play/pause, select wind/rain
 layers, and toggle the overlay.
 
 “The slider shows the corridor at one fixed forecast time. Checkpoint risk
@@ -71,6 +74,9 @@ all-routes-blocked behavior, nonuniform road speeds, forecast units/time
 zones, and provider failures. Resize to phone width. Briefly show keyboard
 city selection, saved trips, or JSON export. Switch between the sun and moon
 controls, reload to show the saved theme, and use **Edit trip** on the phone.
+Briefly open **Departure times** to compare the same road at three starts.
+Explain that forecasts are reused, later is not always better, and **Use time**
+recalculates all roads. Show that the phone editor is a sheet over the map.
 
 ## 6:25–7:10 · Tradeoffs and close
 

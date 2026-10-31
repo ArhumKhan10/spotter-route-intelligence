@@ -41,6 +41,37 @@ def corridor_points(routes):
     return values
 
 
+def assess_checkpoints(checkpoints, forecasts, load, offset_hours=0):
+    points = []
+    for point in checkpoints:
+        eta = datetime.fromisoformat(point['eta']) + timedelta(hours=offset_hours)
+        hourly = forecasts[(round(point['lat'], 3), round(point['lon'], 3))]
+        weather = weather_at(hourly, eta.timestamp())
+        points.append({**point, 'eta': eta.isoformat(), 'weather': weather,
+                       'risk': classify(weather['wind_mph'], weather['rain_in'], weather['snow_in'], load)})
+    return points
+
+
+def departure_choices(route, params, forecasts, now):
+    """Compare the same road at three start times using the already fetched weather."""
+    choices = []
+    for offset in [0, 2, 4]:
+        departure = params['departure'] + timedelta(hours=offset)
+        choice = {'offset_hours': offset, 'departure': departure.isoformat(),
+                  'arrival': (departure + timedelta(seconds=route['duration_seconds'])).isoformat()}
+        if departure > now + timedelta(hours=48):
+            choices.append({**choice, 'available': False, 'reason': 'Outside the 48-hour departure window.'})
+            continue
+        try:
+            summary = route['summary'] if offset == 0 else summarize(
+                assess_checkpoints(route['checkpoints'], forecasts, params['load_lb'], offset),
+                route['distance_miles'])
+            choices.append({**choice, 'available': True, 'summary': summary})
+        except PlanningError as error:
+            choices.append({**choice, 'available': False, 'reason': str(error)})
+    return choices
+
+
 def build_plan(params, raw_routes=None, forecast_fn=weather_forecasts, mode='live'):
     raw_routes = raw_routes if raw_routes is not None else get_routes(params['origin'], params['destination'])
     routes = []
@@ -54,14 +85,11 @@ def build_plan(params, raw_routes=None, forecast_fn=weather_forecasts, mode='liv
                        'arrival': (params['departure']+timedelta(seconds=raw['duration'])).isoformat()})
     corridor = corridor_points(routes)
     forecasts = forecast_fn([p for route in routes for p in route['checkpoints']]+corridor)
-    for route in routes:
-        for point in route['checkpoints']:
-            hourly = forecasts[(round(point['lat'], 3), round(point['lon'], 3))]
-            point['weather'] = weather_at(hourly, datetime.fromisoformat(point['eta']).timestamp())
-            w = point['weather']
-            point['risk'] = classify(w['wind_mph'], w['rain_in'], w['snow_in'], params['load_lb'])
-        route['summary'] = summarize(route['checkpoints'], route['distance_miles'])
     now = datetime.now(timezone.utc)
+    for route in routes:
+        route['checkpoints'] = assess_checkpoints(route['checkpoints'], forecasts, params['load_lb'])
+        route['summary'] = summarize(route['checkpoints'], route['distance_miles'])
+        route['departures'] = departure_choices(route, params, forecasts, now)
     base_time = math.ceil(now.timestamp()/3600)*3600
     times = [base_time+i*3600 for i in range(49)]
     for point in corridor:

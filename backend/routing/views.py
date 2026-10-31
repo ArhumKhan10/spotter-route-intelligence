@@ -51,7 +51,7 @@ def demo(request):
             raise ValueError
     except (ValueError, TypeError):
         raise PlanningError('Invalid example load or interval.', 'invalid_input', 400)
-    return JsonResponse(example_plan(interval, load))
+    return JsonResponse(example_plan(interval, load, request.GET.get('departure')))
 
 
 def frontend(request):

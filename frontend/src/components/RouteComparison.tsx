@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowRight, ShieldCheck } from '@phosphor-icons/react'
 import RiskBar from './RiskBar'
-import { COLORS, duration, LABELS, number } from '../types'
+import { city, COLORS, duration, LABELS, number } from '../types'
 import type { Plan } from '../types'
 import { miles } from '../routeInsights'
 
@@ -18,6 +18,11 @@ export default function RouteComparison({
   )
   return (
     <>
+      <p className="result-summary">
+        {city(plan.trip.origin.name)} to {city(plan.trip.destination.name)} ·{' '}
+        {number(plan.trip.load_lb)} lb ·{' '}
+        {plan.mode === 'demo' ? 'Simulated weather' : 'Live forecast'}
+      </p>
       <div className="comparison-toolbar">
         <span>Weather exposure by road</span>
         <button className="text-button" aria-pressed={all} onClick={() => setAll(!all)}>

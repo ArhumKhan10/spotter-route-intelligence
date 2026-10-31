@@ -1,0 +1,174 @@
+.trip-fields {
+  display: contents;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.trip-fields:disabled input {
+  color: var(--muted);
+  cursor: progress;
+}
+.dirty-note {
+  gap: 8px;
+  line-height: 1.5;
+}
+.pending-result {
+  color: var(--muted);
+}
+.pending-result > button {
+  color: var(--route);
+  white-space: nowrap;
+}
+.pending-result > span {
+  white-space: nowrap;
+}
+.comparison-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+}
+.mobile-no-route {
+  color: var(--blocked-ink);
+  background: var(--blocked-bg);
+}
+.result-trip-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.result-source {
+  display: inline-flex;
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--text);
+}
+.result-source.demo {
+  background: var(--moderate-bg);
+  color: var(--moderate-ink);
+}
+.result-source.live {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+.recommendation-evidence .result-cities {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--text);
+  font-size: 14px;
+  margin: 14px 0 5px;
+}
+.recommendation-evidence .result-departure {
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+.recommendation-evidence h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+.recommendation-evidence .recommendation-headline {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.recommendation-evidence p {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.evidence-table-scroll {
+  margin-top: 24px;
+}
+.evidence-table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 14px;
+}
+.evidence-table th,
+.evidence-table td {
+  padding: 16px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  text-align: right;
+}
+.evidence-table th:first-child {
+  text-align: left;
+  padding-left: 0;
+  width: 42%;
+}
+.evidence-table td:last-child,
+.evidence-table th:last-child {
+  padding-right: 0;
+}
+.evidence-table thead th {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--faint);
+  padding-top: 0;
+  padding-bottom: 12px;
+}
+.evidence-table th > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.evidence-table .risk-bar {
+  margin: 12px 0 6px;
+}
+.evidence-table small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.recommended-row th > span {
+  color: var(--route);
+}
+.recommendation-evidence .evidence-clear-note {
+  color: var(--low-ink);
+  background: var(--low-bg);
+  font-size: 13px;
+  border-radius: 4px;
+  padding: 9px 11px;
+  margin: 18px 0 0;
+}
+.result-summary {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+  .recommendation-evidence .recommendation-headline {
+    font-size: 21px;
+  }
+  .evidence-table {
+    font-size: 13px;
+  }
+  .evidence-table th,
+  .evidence-table td {
+    padding: 14px 6px;
+  }
+  .evidence-table th:first-child {
+    width: 39%;
+  }
+  .evidence-table small {
+    font-size: 13px;
+  }
+  .evidence-table th > span {
+    gap: 5px;
+  }
+  .recommendation-evidence .result-departure {
+    margin-bottom: 20px;
+  }
+}

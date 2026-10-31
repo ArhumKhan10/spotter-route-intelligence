@@ -22,10 +22,17 @@ export const miles = (value: number) =>
 export function routeTradeoff(route: Route, routes: Route[]) {
   if (!route.summary.eligible || !routes.length) return null
   const fastest = routes.reduce((a, b) => (a.duration_seconds <= b.duration_seconds ? a : b))
+  const eligible = routes.filter((candidate) => candidate.summary.eligible)
+  if (eligible.length === 1 && routes.length > 1)
+    return { text: 'Only eligible road', baseline: 'The other roads contain No Travel conditions.' }
   if (fastest.id === route.id)
     return {
-      text: 'Best weather · fastest',
-      baseline: 'Best weather risk and fastest driving time.',
+      text:
+        eligible.length > 1 &&
+        eligible.every((candidate) => compareRisk(candidate.summary, route.summary) === 0)
+          ? 'Same risk · fastest'
+          : 'Lowest risk · fastest',
+      baseline: 'Lowest ranked weather risk; driving time breaks weather ties.',
     }
   const extra = Math.round(route.duration_seconds / 60) - Math.round(fastest.duration_seconds / 60)
   const prefix = extra > 0 ? `+${extra} min` : 'Same drive time'

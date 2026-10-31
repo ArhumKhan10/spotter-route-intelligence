@@ -8,11 +8,13 @@ export default function JourneyWeather({
   active,
   onCheckpoint,
   onDepartures,
+  departureDisabled = false,
 }: {
   route: Route
   active: Checkpoint | null
   onCheckpoint: (point: Checkpoint) => void
   onDepartures: () => void
+  departureDisabled?: boolean
 }) {
   const [selected, setSelected] = useState(0)
   const [hovered, setHovered] = useState<number | null>(null)
@@ -29,6 +31,12 @@ export default function JourneyWeather({
   }, [active, points])
   const point = points[hovered ?? selected] || points[0]
   if (!point) return null
+  const cause = point.risk.causes[0] || ''
+  const metric = cause.includes('Rain')
+    ? `${point.weather.rain_in.toFixed(2)} in/hr rain`
+    : cause.includes('Snow')
+      ? `${point.weather.snow_in.toFixed(2)} in/hr snow`
+      : `${number(point.weather.wind_mph)} mph wind`
   const choose = (index: number) => {
     setSelected(index)
     setHovered(null)
@@ -49,9 +57,13 @@ export default function JourneyWeather({
       <div className="journey-weather-heading">
         <span>
           <i style={{ background: COLORS[point.risk.level] }} />
-          {point.risk.label} <span>· {number(point.weather.wind_mph)} mph wind</span>
+          {point.risk.label} <span>· {metric}</span>
         </span>
-        <button onClick={onDepartures}>
+        <button
+          onClick={onDepartures}
+          disabled={departureDisabled}
+          title={departureDisabled ? 'Update routes to compare the current trip.' : undefined}
+        >
           Departure times <ArrowUpRight size={13} />
         </button>
       </div>
@@ -63,7 +75,7 @@ export default function JourneyWeather({
         aria-valuemin={0}
         aria-valuemax={Math.round(route.distance_miles)}
         aria-valuenow={Math.round(point.mile)}
-        aria-valuetext={`${point.risk.label} at mile ${number(point.mile)}, arriving ${new Date(point.eta).toLocaleString()}, wind ${number(point.weather.wind_mph)} mph`}
+        aria-valuetext={`${point.risk.label} at mile ${number(point.mile)}, arriving ${new Date(point.eta).toLocaleString()}, ${metric}`}
         onPointerMove={(event) => {
           if (event.pointerType === 'mouse') setHovered(nearest(event))
         }}

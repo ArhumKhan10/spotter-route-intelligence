@@ -34,6 +34,7 @@ import ThemeSwitch from './components/ThemeSwitch'
 import JourneyWeather from './components/JourneyWeather'
 import RouteComparison from './components/RouteComparison'
 import DepartureComparison from './components/DepartureComparison'
+import RecommendationDetails from './components/RecommendationDetails'
 import { routeTradeoff } from './routeInsights'
 import { useTheme } from './useTheme'
 import { api, city, COLORS, duration, LABELS, localInput, number, time } from './types'
@@ -84,12 +85,13 @@ export default function App() {
   const selected = plan?.routes.find((r) => r.id === selectedId)
   const recommended = plan?.routes.find((r) => r.id === plan.recommended_id)
   const tradeoff = recommended && plan ? routeTradeoff(recommended, plan.routes) : null
-  const fastestMinutes = plan
-    ? Math.min(...plan.routes.map((r) => Math.round(r.duration_seconds / 60)))
-    : 0
-  const recommendationExtraMinutes = recommended
-    ? Math.round(recommended.duration_seconds / 60) - fastestMinutes
-    : 0
+  const modeLabel = plan
+    ? plan.mode === 'live'
+      ? 'Live'
+      : 'Demo'
+    : loading
+      ? 'Loading'
+      : 'No results'
   const legendTitle =
     layer === 'wind'
       ? 'Wind gusts · mph'
@@ -108,7 +110,9 @@ export default function App() {
           : LABELS
   const dirty =
     !!plan &&
-    (origin?.lat !== plan.trip.origin.lat ||
+    (origin?.name !== plan.trip.origin.name ||
+      destination?.name !== plan.trip.destination.name ||
+      origin?.lat !== plan.trip.origin.lat ||
       origin?.lon !== plan.trip.origin.lon ||
       destination?.lat !== plan.trip.destination.lat ||
       destination?.lon !== plan.trip.destination.lon ||
@@ -118,14 +122,20 @@ export default function App() {
 
   const accept = (result: Plan) => {
     setPlan(result)
+    setOrigin(result.trip.origin)
+    setDestination(result.trip.destination)
+    setLoad(String(result.trip.load_lb))
+    setIntervalMiles(result.trip.interval_miles)
+    setDeparture(localInput(new Date(result.trip.departure)))
     setSelectedId(result.recommended_id || result.routes[0]?.id || '')
     setCheckpoint(null)
     setHour(0)
     setPlaying(false)
     setMobileEditing(false)
+    setModal(null)
   }
   const editTrip = () => {
-    setMobileEditing(true)
+    setMobileEditing(window.matchMedia('(max-width: 900px)').matches)
     requestAnimationFrame(() => plannerRef.current?.focus())
   }
   const showMap = () => {
@@ -163,14 +173,13 @@ export default function App() {
     request.current = controller
     api<Plan>('/api/demo/', { signal: controller.signal })
       .then((result) => {
-        accept(result)
-        setDeparture(localInput(new Date(result.trip.departure)))
+        if (!controller.signal.aborted && request.current === controller) accept(result)
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message)
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
+        if (!controller.signal.aborted && request.current === controller) setLoading(false)
       })
     return () => controller.abort()
   }, [])
@@ -199,25 +208,40 @@ export default function App() {
     request.current = controller
     setLoading(true)
     setError('')
+    setMobileEditing(false)
+    setModal(null)
     try {
       const result = await api<Plan>(`/api/demo/?interval=${interval}&load=${Number(load) || 0}`, {
         signal: controller.signal,
       })
-      accept(result)
-      setOrigin(CHICAGO)
-      setDestination(NASHVILLE)
-      setDeparture(localInput(new Date(result.trip.departure)))
+      if (!controller.signal.aborted && request.current === controller) accept(result)
     } catch (e) {
       if (!controller.signal.aborted)
         setError(e instanceof Error ? e.message : 'Unable to load the example.')
     } finally {
-      if (!controller.signal.aborted) setLoading(false)
+      if (!controller.signal.aborted && request.current === controller) setLoading(false)
     }
   }
-  const findRoutes = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const findRoutes = async (event?: React.FormEvent) => {
+    event?.preventDefault()
     if (!origin || !destination) {
       setError('Select an origin and destination from the city search results.')
+      editTrip()
+      return
+    }
+    if (
+      !load.trim() ||
+      !Number.isFinite(Number(load)) ||
+      Number(load) < 0 ||
+      Number(load) > 80000
+    ) {
+      setError('Enter a load between 0 and 80,000 lb.')
+      editTrip()
+      return
+    }
+    if (!departure || !Number.isFinite(new Date(departure).getTime())) {
+      setError('Choose a valid departure date and time.')
+      editTrip()
       return
     }
     request.current?.abort()
@@ -226,6 +250,8 @@ export default function App() {
     setLoading(true)
     setError('')
     setCheckpoint(null)
+    setMobileEditing(false)
+    setModal(null)
     try {
       const result = await api<Plan>('/api/plan/', {
         method: 'POST',
@@ -239,16 +265,18 @@ export default function App() {
           interval_miles: interval,
         }),
       })
-      accept(result)
+      if (!controller.signal.aborted && request.current === controller) accept(result)
     } catch (e) {
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted && request.current === controller) {
         setError(
           e instanceof Error && e.name !== 'TimeoutError'
             ? e.message
             : 'The providers took too long. Please try again.',
         )
+        editTrip()
+      }
     } finally {
-      if (!controller.signal.aborted) setLoading(false)
+      if (!controller.signal.aborted && request.current === controller) setLoading(false)
     }
   }
   const select = (id: string) => {
@@ -256,7 +284,7 @@ export default function App() {
     setCheckpoint(null)
   }
   const applyDeparture = async (option: DepartureOption) => {
-    if (!plan || !option.available || loading) return
+    if (!plan || !option.available || loading || dirty) return
     request.current?.abort()
     const controller = new AbortController()
     request.current = controller
@@ -275,26 +303,22 @@ export default function App() {
               signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120000)]),
               body: JSON.stringify({ ...plan.trip, departure: option.departure }),
             })
-      accept(result)
-      setOrigin(result.trip.origin)
-      setDestination(result.trip.destination)
-      setLoad(String(result.trip.load_lb))
-      setIntervalMiles(result.trip.interval_miles)
-      setDeparture(localInput(new Date(result.trip.departure)))
-      setModal(null)
-      setToast('Departure updated. All routes recalculated.')
+      if (!controller.signal.aborted && request.current === controller) {
+        accept(result)
+        setToast('Departure updated. All routes recalculated.')
+      }
     } catch (e) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && request.current === controller) {
         setError(e instanceof Error ? e.message : 'Unable to update departure.')
         setModal(null)
         editTrip()
       }
     } finally {
-      if (!controller.signal.aborted) setLoading(false)
+      if (!controller.signal.aborted && request.current === controller) setLoading(false)
     }
   }
   const saveTrip = () => {
-    if (!plan) return
+    if (!plan || dirty || loading) return
     const item = {
       origin: plan.trip.origin,
       destination: plan.trip.destination,
@@ -399,105 +423,107 @@ export default function App() {
               aria-label={plan?.mode === 'live' ? 'About live forecast' : 'About demo data'}
             >
               <span />
-              {plan?.mode === 'live' ? 'Live' : 'Demo'}
+              {modeLabel}
             </button>
           </div>
           <form className="trip-planner" aria-label="Plan your trip" onSubmit={findRoutes}>
-            <div className="locations">
-              <CityInput label="Origin" value={origin} onChange={setOrigin} kind="origin" />
-              <button
-                className="swap-button"
-                type="button"
-                aria-label="Swap origin and destination"
-                onClick={() => {
-                  setOrigin(destination)
-                  setDestination(origin)
-                }}
-              >
-                <ArrowsDownUp size={15} />
-              </button>
-              <CityInput
-                label="Destination"
-                value={destination}
-                onChange={setDestination}
-                kind="destination"
-              />
-            </div>
-            <div className="departure-field">
-              <label htmlFor="departure">
-                Departure{' '}
-                <span>
-                  {Intl.DateTimeFormat()
-                    .resolvedOptions()
-                    .timeZone.split('/')
-                    .pop()
-                    ?.replaceAll('_', ' ')}
-                </span>
-              </label>
-              <div className="input-wrap">
-                <CalendarBlank size={16} />
-                <input
-                  id="departure"
-                  type="datetime-local"
-                  value={departure}
-                  onChange={(e) => setDeparture(e.target.value)}
-                  required
-                  min={localInput(new Date(Date.now() - 300000))}
-                  max={localInput(new Date(Date.now() + 48 * 3600000))}
+            <fieldset className="trip-fields" disabled={loading}>
+              <div className="locations">
+                <CityInput label="Origin" value={origin} onChange={setOrigin} kind="origin" />
+                <button
+                  className="swap-button"
+                  type="button"
+                  aria-label="Swap origin and destination"
+                  onClick={() => {
+                    setOrigin(destination)
+                    setDestination(origin)
+                  }}
+                >
+                  <ArrowsDownUp size={15} />
+                </button>
+                <CityInput
+                  label="Destination"
+                  value={destination}
+                  onChange={setDestination}
+                  kind="destination"
                 />
               </div>
-            </div>
-            <div className="load-interval">
-              <div className="load-field">
-                <label htmlFor="load">Load weight</label>
+              <div className="departure-field">
+                <label htmlFor="departure">
+                  Departure{' '}
+                  <span>
+                    {Intl.DateTimeFormat()
+                      .resolvedOptions()
+                      .timeZone.split('/')
+                      .pop()
+                      ?.replaceAll('_', ' ')}
+                  </span>
+                </label>
                 <div className="input-wrap">
-                  <Truck size={17} />
+                  <CalendarBlank size={16} />
                   <input
-                    id="load"
-                    type="number"
-                    min="0"
-                    max="80000"
-                    step="1"
-                    value={load}
-                    onChange={(e) => setLoad(e.target.value)}
+                    id="departure"
+                    type="datetime-local"
+                    value={departure}
+                    onChange={(e) => setDeparture(e.target.value)}
                     required
+                    min={localInput(new Date(Date.now() - 300000))}
+                    max={localInput(new Date(Date.now() + 48 * 3600000))}
                   />
-                  <span>lb</span>
                 </div>
               </div>
-              <fieldset className="interval-field">
-                <legend>
-                  Check every <span>mi</span>
-                </legend>
-                <div className="segmented">
-                  {[10, 25, 50].map((value) => (
-                    <button
-                      type="button"
-                      key={value}
-                      className={interval === value ? 'selected' : ''}
-                      aria-pressed={interval === value}
-                      onClick={() => setIntervalMiles(value)}
-                    >
-                      {value}
-                    </button>
-                  ))}
+              <div className="load-interval">
+                <div className="load-field">
+                  <label htmlFor="load">Load weight</label>
+                  <div className="input-wrap">
+                    <Truck size={17} />
+                    <input
+                      id="load"
+                      type="number"
+                      min="0"
+                      max="80000"
+                      step="1"
+                      value={load}
+                      onChange={(e) => setLoad(e.target.value)}
+                      required
+                    />
+                    <span>lb</span>
+                  </div>
                 </div>
-              </fieldset>
-            </div>
-            <button className="primary plan-button" type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <CircleNotch size={17} className="spin" />
-                  Checking forecasts
-                </>
-              ) : (
-                <>
-                  <NavigationArrow size={16} weight="fill" />
-                  Find safest route
-                  <ArrowRight size={17} />
-                </>
-              )}
-            </button>
+                <fieldset className="interval-field">
+                  <legend>
+                    Check every <span>mi</span>
+                  </legend>
+                  <div className="segmented">
+                    {[10, 25, 50].map((value) => (
+                      <button
+                        type="button"
+                        key={value}
+                        className={interval === value ? 'selected' : ''}
+                        aria-pressed={interval === value}
+                        onClick={() => setIntervalMiles(value)}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              </div>
+              <button className="primary plan-button" type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <CircleNotch size={17} className="spin" />
+                    Checking forecasts
+                  </>
+                ) : (
+                  <>
+                    <NavigationArrow size={16} weight="fill" />
+                    Find safest route
+                    <ArrowRight size={17} />
+                  </>
+                )}
+              </button>
+            </fieldset>
           </form>
           {error && (
             <div className="error-message" role="alert">
@@ -519,7 +545,7 @@ export default function App() {
           )}
           {dirty && !loading && (
             <div className="dirty-note">
-              Unsaved trip changes{' '}
+              Trip changed. Update routes to recalculate.{' '}
               <button
                 onClick={() => document.getElementById('load')?.focus()}
                 title="Update the trip, then find routes"
@@ -531,7 +557,7 @@ export default function App() {
           <section className="route-options" aria-labelledby="routes-title">
             <div className="options-heading">
               <h2 id="routes-title">
-                Routes <span>{plan?.routes.length || '-'}</span>
+                Routes <span>{plan?.routes.length ?? '-'}</span>
               </h2>
               <button onClick={() => setModal('compare')} disabled={!plan}>
                 Compare <ArrowUpRight size={13} />
@@ -543,7 +569,7 @@ export default function App() {
                 <span>{warning}</span>
               </div>
             ))}
-            <div className={`route-list ${loading ? 'updating' : ''}`}>
+            <div className={`route-list ${loading || dirty ? 'updating' : ''}`}>
               {plan ? (
                 plan.routes.map((route) => (
                   <RouteCard
@@ -573,7 +599,7 @@ export default function App() {
           <div className="planner-bottom">
             <span className="data-source">
               <span className={`source-dot ${plan?.mode === 'demo' ? 'demo' : ''}`} />
-              {plan?.mode === 'demo' ? 'Simulated weather' : 'Live forecast'}
+              {plan ? (plan.mode === 'demo' ? 'Simulated weather' : 'Live forecast') : modeLabel}
             </span>
             {plan?.mode === 'demo' && (
               <button onClick={loadExample} disabled={loading}>
@@ -608,13 +634,13 @@ export default function App() {
                 'Your route'
               )}
             </h1>
-            <span className="map-mode">{plan?.mode === 'live' ? 'Live' : 'Demo'}</span>
+            <span className="map-mode">{modeLabel}</span>
             <button
               className="save-map-trip"
               aria-label="Save current trip"
               title="Save current trip"
               onClick={saveTrip}
-              disabled={!plan}
+              disabled={!plan || dirty || loading}
             >
               <BookmarkSimple size={16} />
             </button>
@@ -655,7 +681,15 @@ export default function App() {
               </button>
             </div>
           )}
-          {checkpoint ? (
+          {dirty && !loading ? (
+            <div className="journey-card pending-result" role="status">
+              <Info size={16} />
+              <span>Previous results</span>
+              <button onClick={() => findRoutes()}>
+                Update routes <ArrowUpRight size={14} />
+              </button>
+            </div>
+          ) : checkpoint ? (
             <CheckpointDetail point={checkpoint} onClose={() => setCheckpoint(null)} />
           ) : (
             selected && (
@@ -689,7 +723,12 @@ export default function App() {
                   Compare <ArrowUpRight size={12} />
                 </button>
               </div>
-              <div className="mobile-route-list">
+              <div
+                className="mobile-route-list"
+                style={{
+                  gridTemplateColumns: `repeat(${plan?.routes.length || 1}, minmax(0, 1fr))`,
+                }}
+              >
                 {plan?.routes.map((route) => (
                   <button
                     key={route.id}
@@ -712,6 +751,11 @@ export default function App() {
               {selectedId === recommended?.id && tradeoff && (
                 <p className="mobile-tradeoff" title={tradeoff.baseline}>
                   {tradeoff.text}
+                </p>
+              )}
+              {plan && !recommended && (
+                <p className="mobile-tradeoff mobile-no-route" role="alert">
+                  No eligible road. Try another departure.
                 </p>
               )}
             </div>
@@ -775,6 +819,7 @@ export default function App() {
                     active={checkpoint}
                     onCheckpoint={setCheckpoint}
                     onDepartures={() => setModal('departures')}
+                    departureDisabled={dirty || loading}
                   />
                 )}
               </div>
@@ -896,35 +941,11 @@ export default function App() {
               demo={plan?.mode === 'demo'}
               loading={loading}
               onApply={applyDeparture}
+              trip={plan!.trip}
             />
           )}
-          {modal === 'why' && recommended && (
-            <section className="recommendation-evidence" aria-label="Recommendation explanation">
-              <h3>{recommended.name} is recommended</h3>
-              <p>Weather risk takes priority over driving time.</p>
-              <dl>
-                <div>
-                  <dt>Severe weather</dt>
-                  <dd>
-                    {recommended.summary.risk_miles[3].toFixed(1)} <span>mi</span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>High-risk weather</dt>
-                  <dd>
-                    {recommended.summary.risk_miles[2].toFixed(1)} <span>mi</span>
-                  </dd>
-                </div>
-              </dl>
-              <p>
-                {recommendationExtraMinutes > 0
-                  ? `${recommendationExtraMinutes} minutes longer than the fastest route. Less dangerous weather comes first.`
-                  : 'Also the fastest route among the options with the best weather risk.'}
-              </p>
-              <button className="text-button" onClick={() => setModal('method')}>
-                View the risk rules <ArrowUpRight size={14} />
-              </button>
-            </section>
+          {modal === 'why' && plan && (
+            <RecommendationDetails plan={plan} onRules={() => setModal('method')} />
           )}
           {modal === 'compare' && plan && (
             <RouteComparison
@@ -1049,7 +1070,8 @@ export default function App() {
                         setIntervalMiles(trip.interval)
                         setDeparture(localInput())
                         setModal(null)
-                        setToast('Trip loaded. Find routes for a fresh forecast.')
+                        setToast('Trip loaded. Update routes for a fresh forecast.')
+                        editTrip()
                       }}
                     >
                       Open <ArrowRight size={15} />

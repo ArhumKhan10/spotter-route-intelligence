@@ -40,6 +40,7 @@ export default function CityInput({
           `/api/geocode/?q=${encodeURIComponent(query)}`,
           { signal: controller.signal },
         )
+        if (controller.signal.aborted) return
         setResults(data.results)
         if (!data.results.length) setMessage('No cities found. Try a nearby city.')
       } catch (e) {
@@ -67,6 +68,8 @@ export default function CityInput({
     setOpen(false)
     setResults([])
   }
+  const showingResults =
+    open && query.length >= 2 && query !== value?.name && (results.length > 0 || !!message)
   return (
     <div className="city-field" ref={wrapper}>
       <label htmlFor={id}>{label}</label>
@@ -80,7 +83,7 @@ export default function CityInput({
           autoComplete="off"
           placeholder={kind === 'origin' ? 'Where are you starting?' : 'Where are you headed?'}
           role="combobox"
-          aria-expanded={open && (results.length > 0 || !!message)}
+          aria-expanded={showingResults}
           aria-controls={`${id}-results`}
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
@@ -127,7 +130,7 @@ export default function CityInput({
           )
         )}
       </div>
-      {open && query.length >= 2 && query !== value?.name && (results.length > 0 || message) && (
+      {showingResults && (
         <div
           className="city-results"
           id={`${id}-results`}

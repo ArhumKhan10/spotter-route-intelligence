@@ -10,7 +10,8 @@ clearly labeled simulated weather. Route A is faster, while recommended
 Route B avoids its High-risk weather exposure.
 
 - Select a route card or a road on the map to highlight it.
-- Open **Why Route B?** for the recommendation evidence.
+- Open **Why Route B?** for the actual trip and a comparison with the fastest
+  road: 20 extra minutes avoids 75 High-risk miles in this example.
 - Choose **Compare** for driving time and weather mileage side by side.
   **Show all risk bands** reveals categories shared at zero miles.
 - Choose **View trip** for checkpoint arrival times, weather, and JSON export.
@@ -28,8 +29,20 @@ example scenario. **Demo trip** restores the example cities.
 3. Enter the truck's load in pounds and choose 10, 25, or 50 mile checkpoints.
 4. Select **Find safest route** to request road alternatives and live forecasts.
 
-The **Live** label identifies live results. Provider failures show an error
-and preserve the previous results with their original data label.
+The **Live** label identifies live results. The map, route cards, journey
+weather, comparison, and departure options update together for the new trip.
+The recommendation explanation identifies its cities, departure, load, and
+checkpoint spacing. When eligible roads have equal weather risk, driving time
+decides. If every road has No Travel conditions, none is recommended.
+
+Changing an input shows **Previous results** and **Update routes** until the
+new trip is calculated. Saving and departure changes are disabled while edits
+are pending. Provider failures show an error and preserve the previous results
+with their original data label. You can cancel a request without replacing them.
+
+![Live Austin-to-Houston trip](live-trip.png)
+
+![Trip-specific recommendation evidence](recommendation.png)
 
 ## Inspect weather along the road
 
@@ -72,7 +85,8 @@ road may change. Demo trips continue to use simulated weather.
 
 Use the sun and moon controls in the top-right corner to select light or dark
 mode. Your choice persists on this device. The bookmark above the map saves
-the current trip inputs; the header bookmark opens saved trips.
+the current trip inputs; the header bookmark opens saved trips. Opening a
+saved trip fills the planner. Select **Update routes** for a fresh forecast.
 
 Public OSRM driving routes do not validate truck clearances or restrictions.
 ETAs exclude traffic, stops, and breaks. See the [project limitations](../README.md#limitations).

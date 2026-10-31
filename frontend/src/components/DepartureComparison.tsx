@@ -1,18 +1,20 @@
 import { ArrowRight, Check } from '@phosphor-icons/react'
 import { compareRisk, miles } from '../routeInsights'
-import { LABELS, time } from '../types'
-import type { DepartureOption, Route } from '../types'
+import { city, LABELS, number, time } from '../types'
+import type { DepartureOption, Plan, Route } from '../types'
 
 export default function DepartureComparison({
   route,
   demo,
   loading,
   onApply,
+  trip,
 }: {
   route: Route
   demo: boolean
   loading: boolean
   onApply: (option: DepartureOption) => void
+  trip: Plan['trip']
 }) {
   const options = route.departures || []
   const evaluated = options.filter(
@@ -33,7 +35,8 @@ export default function DepartureComparison({
   return (
     <div className="departure-comparison">
       <p className="departure-context">
-        {route.name} · Same road and load · {demo ? 'Simulated weather' : 'Arrival-time forecasts'}
+        {city(trip.origin.name)} to {city(trip.destination.name)} · {number(trip.load_lb)} lb ·{' '}
+        {route.name} · {demo ? 'Simulated weather' : 'Live forecast'}
       </p>
       <div className="departure-table-scroll">
         <table className="departure-table">

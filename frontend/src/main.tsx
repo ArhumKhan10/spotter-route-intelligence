@@ -7,6 +7,7 @@ import '@fontsource/geist/latin-700.css'
 import 'leaflet/dist/leaflet.css'
 import './map-workspace.css'
 import './route-improvements.css'
+import './result-details.css'
 import App from './App'
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {

@@ -21,7 +21,8 @@ to encounter, including the effect of load weight on wind risk.
 - Forecasts at each checkpoint's **estimated arrival time**, using road-segment
   durations and load-aware wind, rain, and snow risk rules.
 - Interactive routes, a journey weather strip, checkpoint inspection,
-  comparison views, and recommendation tradeoffs.
+  comparison views, and trip-specific recommendation evidence, including
+  weather ties and excluded roads.
 - A canvas corridor heatmap with a **0–48 hour slider**, playback, and weather
   layers, separate from arrival-time route ranking.
 - Departure comparisons at the current start, +2 hours, and +4 hours, reusing
@@ -53,6 +54,10 @@ geometries with **explicitly simulated weather**. Click **Find safest route**
 for live forecasts, or search and select different cities. Example mode never
 silently replaces a failed live request. Use **Refresh demo** to explore load
 or checkpoint-spacing changes in the example scenario.
+
+Changed inputs show **Previous results** until **Update routes** completes.
+Cities, roads, risk evidence, and weather views update together from the new
+response. See the [user guide](docs/USAGE.md) for current screenshots and controls.
 
 ## Risk and recommendation
 
@@ -103,6 +108,11 @@ nonuniform segment speeds, endpoint sampling, validation, HTTP errors, and the
 full example pipeline. Playwright runs desktop and mobile flows using Microsoft
 Edge. Set `PLAYWRIGHT_BASE_URL` to test a deployed app. For another browser,
 change `channel` in `frontend/playwright.config.ts`.
+
+Custom-trip browser cases isolate the response contract with fixtures for
+weather ties, fewer alternatives, No Travel conditions, changed inputs,
+provider errors, and cancellation. Separate live checks exercise real routing,
+geocoding, and weather providers.
 
 Interaction checks isolate external basemap tiles. To refresh the real-map
 screenshots in `docs`, set `CAPTURE_MAPS=1` and run Playwright with

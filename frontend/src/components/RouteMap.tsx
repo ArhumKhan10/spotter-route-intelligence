@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapContainer,
   TileLayer,
   Polyline,
   CircleMarker,
+  FeatureGroup,
   Tooltip,
   Pane,
   useMap,
@@ -276,6 +277,17 @@ function MapControls({
 export default function RouteMap(props: Props) {
   const { plan, selectedId, onSelect, hour, heatmap, layer, onCheckpoint, theme } = props
   const casing = theme === 'dark' ? '#17191a' : '#ffffff'
+  const routeLayers = useRef(new Map<string, L.FeatureGroup>())
+  const endpointLayers = useRef<L.FeatureGroup>(null)
+  const selectedRoute = plan?.routes.find((route) => route.id === selectedId) || plan?.routes[0]
+  const roadStart = selectedRoute?.geometry.coordinates[0]
+  const roadEnd = selectedRoute?.geometry.coordinates.at(-1)
+  useEffect(() => {
+    // React key ordering does not reorder paths owned by Leaflet's SVG renderer.
+    // Lift the entire selected road, including its weather markers, above the others.
+    routeLayers.current.get(selectedId)?.bringToFront()
+    endpointLayers.current?.bringToFront()
+  }, [selectedId, plan])
   const initialBounds = useMemo(
     () =>
       plan
@@ -332,7 +344,13 @@ export default function RouteMap(props: Props) {
             const chosen = route.id === selectedId
             const positions = positionsById[route.id]
             return (
-              <Fragment key={route.id}>
+              <FeatureGroup
+                key={route.id}
+                ref={(group) => {
+                  if (group) routeLayers.current.set(route.id, group)
+                  else routeLayers.current.delete(route.id)
+                }}
+              >
                 <Polyline
                   positions={positions}
                   pathOptions={{ color: casing, weight: chosen ? 9 : 7, opacity: 0.95 }}
@@ -367,49 +385,48 @@ export default function RouteMap(props: Props) {
                       : 'No Travel'}
                   </Tooltip>
                 </Polyline>
-              </Fragment>
+                {route.checkpoints.map((p, i) => (
+                  <CircleMarker
+                    key={p.id}
+                    center={[p.lat, p.lon]}
+                    radius={route.id === selectedId ? (p.risk.level >= 2 ? 5.5 : 4) : 3}
+                    pathOptions={{
+                      color: casing,
+                      weight: route.id === selectedId ? 2 : 1.5,
+                      fillColor: COLORS[p.risk.level],
+                      fillOpacity: route.id === selectedId ? 1 : 0.75,
+                    }}
+                    eventHandlers={{
+                      click: () => {
+                        onSelect(route.id)
+                        onCheckpoint(p)
+                      },
+                    }}
+                  >
+                    <Tooltip direction="top">
+                      <strong>
+                        {route.name} ·{' '}
+                        {i === 0
+                          ? city(plan!.trip.origin.name)
+                          : i === route.checkpoints.length - 1
+                            ? city(plan!.trip.destination.name)
+                            : `Mile ${number(p.mile)}`}
+                      </strong>
+                      <br />
+                      {time(p.eta)} · {p.risk.label}
+                      <br />
+                      Wind {number(p.weather.wind_mph)} mph · Rain {p.weather.rain_in.toFixed(2)}{' '}
+                      in/hr
+                    </Tooltip>
+                  </CircleMarker>
+                ))}
+              </FeatureGroup>
             )
           })}
-          {sorted.flatMap((route) =>
-            route.checkpoints.map((p, i) => (
+          {plan && roadStart && roadEnd && (
+            <FeatureGroup ref={endpointLayers}>
               <CircleMarker
-                key={`${route.id}-${p.id}`}
-                center={[p.lat, p.lon]}
-                radius={route.id === selectedId ? (p.risk.level >= 2 ? 5.5 : 4) : 3}
-                pathOptions={{
-                  color: casing,
-                  weight: route.id === selectedId ? 2 : 1.5,
-                  fillColor: COLORS[p.risk.level],
-                  fillOpacity: route.id === selectedId ? 1 : 0.75,
-                }}
-                eventHandlers={{
-                  click: () => {
-                    onSelect(route.id)
-                    onCheckpoint(p)
-                  },
-                }}
-              >
-                <Tooltip direction="top">
-                  <strong>
-                    {route.name} ·{' '}
-                    {i === 0
-                      ? city(plan!.trip.origin.name)
-                      : i === route.checkpoints.length - 1
-                        ? city(plan!.trip.destination.name)
-                        : `Mile ${number(p.mile)}`}
-                  </strong>
-                  <br />
-                  {time(p.eta)} · {p.risk.label}
-                  <br />
-                  Wind {number(p.weather.wind_mph)} mph · Rain {p.weather.rain_in.toFixed(2)} in/hr
-                </Tooltip>
-              </CircleMarker>
-            )),
-          )}
-          {plan && (
-            <>
-              <CircleMarker
-                center={[plan.trip.origin.lat, plan.trip.origin.lon]}
+                center={[roadStart[1], roadStart[0]]}
                 radius={7}
                 pathOptions={{
                   color: casing,
@@ -423,7 +440,7 @@ export default function RouteMap(props: Props) {
                 </Tooltip>
               </CircleMarker>
               <CircleMarker
-                center={[plan.trip.destination.lat, plan.trip.destination.lon]}
+                center={[roadEnd[1], roadEnd[0]]}
                 radius={7}
                 pathOptions={{ color: casing, weight: 3, fillColor: '#f17a45', fillOpacity: 1 }}
               >
@@ -431,7 +448,7 @@ export default function RouteMap(props: Props) {
                   {city(plan.trip.destination.name)}
                 </Tooltip>
               </CircleMarker>
-            </>
+            </FeatureGroup>
           )}
           <MapControls {...props} />
         </MapContainer>

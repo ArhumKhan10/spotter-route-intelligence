@@ -9,7 +9,7 @@ Checked on 2026-10-31 using Python 3.12, Node 22, and Microsoft Edge.
   Departure checks verify shifted arrival forecasts, identical load rules,
   nonmutation of the current trip, forecast gaps, the 48-hour window, and reuse
   of one forecast fetch for all departure options.
-- **26 Playwright checks pass locally and were verified on the public deployment** across
+- **30 Playwright checks pass locally** across
   1440px desktop and 390px phone viewports. They exercise route comparison,
   checkpoint inspection, JSON export, slider playback, layer selection,
   overlay controls, keyboard city selection, input changes, explicit provider
@@ -25,6 +25,13 @@ Checked on 2026-10-31 using Python 3.12, Node 22, and Microsoft Edge.
   inspection, comparison detail toggles, applying later starts, unavailable
   weather versus No Travel, 44px phone controls, sheet focus trapping, and
   returning keyboard focus to Edit trip.
+  Route-continuity regressions also verify native SVG draw order after repeated
+  A/C/B/A switches in both themes, plus origin/destination pin alignment at
+  street-level zoom, on desktop and phones. The draw-order test reproduced the
+  old hosted failure before the fix.
+  The four new continuity/zoom cases and two checkpoint/export/comparison flows
+  also pass against the published fix.
+  The preceding 26-check feature suite was verified on the public deployment.
   One hosted navigation check was retried after Edge reported
   `ERR_NETWORK_IO_SUSPENDED` before loading the page; the retry passed.
 - **Live hosted smoke checks pass:** health, React HTML and JavaScript/CSS,

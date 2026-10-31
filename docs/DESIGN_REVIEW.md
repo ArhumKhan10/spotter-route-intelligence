@@ -1,5 +1,19 @@
 # Visual review
 
+## Route continuity fix
+
+All three demo road geometries share the same start and end. The apparent gap
+on Route A came from SVG paint order: reordering React children did not reorder
+Leaflet's existing paths, so another route's casing covered the shared first
+section. Each road and its weather markers now form a Leaflet feature group.
+The active group is explicitly raised after selection, with endpoint pins above
+it. Pins use the selected road's snapped endpoints rather than the nearby city
+coordinates, keeping them attached at street-level zoom too.
+
+The regression was reproduced against the old hosted app before the fix. New
+browser checks cover repeated A/C/B/A changes in both themes and both endpoints
+at close zoom, on desktop and phones.
+
 ## Current route insights and phone improvements
 
 The accepted improvement pass keeps the existing Taste Skill `true-black-flat`

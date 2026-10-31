@@ -65,6 +65,81 @@ test('example trip, route comparison, checkpoint and export', async ({ page }) =
   await page.getByRole('button', { name: 'Close dialog' }).click()
 })
 
+test('each selected road stays visible from the origin after repeated route changes', async ({
+  page,
+}) => {
+  for (const theme of ['Dark mode', 'Light mode']) {
+    await page.getByRole('button', { name: theme, exact: true }).click()
+    for (const name of ['A', 'C', 'B', 'A']) {
+      await page.getByRole('button', { name: new RegExp(`Route ${name}, `) }).click()
+      const rendered = await page.locator('.leaflet-overlay-pane svg path').evaluateAll((paths) => {
+        const roads = paths.filter(
+          (path) =>
+            (path.getAttribute('d') || '').includes('L') &&
+            ['3', '5', '7', '9'].includes(path.getAttribute('stroke-width') || ''),
+        )
+        const active = roads.find(
+          (path) => path.getAttribute('stroke-width') === '5',
+        ) as SVGPathElement
+        const start = active.getPointAtLength(0)
+        const pins = paths.filter((path) =>
+          ['#b2e8c6', '#254f40'].includes(path.getAttribute('fill') || ''),
+        ) as SVGGraphicsElement[]
+        const pin = pins[0].getBBox()
+        return {
+          frontmostWeight: roads.at(-1)?.getAttribute('stroke-width'),
+          gap: Math.hypot(start.x - (pin.x + pin.width / 2), start.y - (pin.y + pin.height / 2)),
+        }
+      })
+      expect(rendered.frontmostWeight, `${theme}: ${name} must remain above every other road`).toBe(
+        '5',
+      )
+      expect(rendered.gap, `${theme}: ${name} must start at the origin pin`).toBeLessThanOrEqual(1)
+    }
+  }
+})
+
+test('origin and destination pins stay connected to the road at street zoom', async ({ page }) => {
+  test.setTimeout(60000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.getByRole('button', { name: /Route A, / }).click()
+  await page.getByRole('switch', { name: 'Weather overlay' }).click()
+  const profile = page.getByRole('slider', { name: 'Arrival weather along selected route' })
+  await profile.focus()
+  await profile.press('Home')
+  await page.getByRole('button', { name: 'Close checkpoint', exact: true }).click()
+  for (let i = 0; i < 11; i++) {
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+    // Leaflet's zoom buttons animate for 250ms; wait before the next increment.
+    await page.waitForTimeout(300)
+  }
+  for (const endpoint of ['origin', 'destination']) {
+    if (endpoint === 'destination') {
+      await profile.focus()
+      await profile.press('End')
+      await page.getByRole('button', { name: 'Close checkpoint', exact: true }).click()
+    }
+    await expect
+      .poll(
+        () =>
+          page.locator('.leaflet-overlay-pane svg').evaluate((svg, endpoint) => {
+            const road = svg.querySelector('path[stroke-width="5"]') as SVGPathElement
+            const point = road.getPointAtLength(endpoint === 'origin' ? 0 : road.getTotalLength())
+            const pin = svg.querySelector(
+              endpoint === 'origin' ? 'path[fill="#b2e8c6"]' : 'path[fill="#f17a45"]',
+            ) as SVGGraphicsElement
+            const bounds = pin.getBBox()
+            return Math.hypot(
+              point.x - (bounds.x + bounds.width / 2),
+              point.y - (bounds.y + bounds.height / 2),
+            )
+          }, endpoint),
+        { message: `${endpoint} must remain attached to the road when zoomed in`, timeout: 5000 },
+      )
+      .toBeLessThanOrEqual(1)
+  }
+})
+
 test('forecast slider, layers and overlay', async ({ page }) => {
   await page.getByRole('tab', { name: 'Area forecast', exact: true }).click()
   const slider = page.getByRole('slider', { name: 'Forecast hours ahead' })

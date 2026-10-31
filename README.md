@@ -1,14 +1,35 @@
-# Spotter · Route intelligence
+# Spotter
 
 A weather-aware truck-route planner built with **React, TypeScript, Django, and
 Leaflet**. Compare real road options against the forecasts a driver is expected
 to encounter, including the effect of load weight on wind risk.
 
-**[Open the hosted application](https://spotter-route-intelligence.vercel.app)**
-· [GitHub source](https://github.com/ArhumKhan10/spotter-route-intelligence)
-· [How to use it](docs/HOW_IT_WORKS.md)
+[![CI](https://github.com/ArhumKhan10/spotter-route-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/ArhumKhan10/spotter-route-intelligence/actions/workflows/ci.yml)
+
+**[Live demo](https://spotter-route-intelligence.vercel.app)**
+· [User guide](docs/USAGE.md)
+· [CI checks](https://github.com/ArhumKhan10/spotter-route-intelligence/actions/workflows/ci.yml)
 
 ![Spotter desktop workspace](docs/desktop.png)
+
+## Features
+
+- City search, departure with an explicit time zone, load weight, and
+  10/25/50 mile checkpoints.
+- Up to three distinct OSRM road alternatives, with waypoint-based requests
+  when native alternatives are limited.
+- Forecasts at each checkpoint's **estimated arrival time**, using road-segment
+  durations and load-aware wind, rain, and snow risk rules.
+- Interactive routes, a journey weather strip, checkpoint inspection,
+  comparison views, and recommendation tradeoffs.
+- A canvas corridor heatmap with a **0–48 hour slider**, playback, and weather
+  layers, separate from arrival-time route ranking.
+- Departure comparisons at the current start, +2 hours, and +4 hours, reusing
+  the same forecasts. Applying a time recalculates all roads.
+- Responsive dark/light themes, a phone input sheet, keyboard controls,
+  reduced-motion support, and self-hosted fonts.
+- Local saved trips, JSON export, input validation, provider caching,
+  request limits, timeouts, and explicit upstream errors.
 
 ## Run locally
 
@@ -33,37 +54,6 @@ for live forecasts, or search and select different cities. Example mode never
 silently replaces a failed live request. Use **Refresh demo** to explore load
 or checkpoint-spacing changes in the example scenario.
 
-## What is implemented
-
-- Origin/destination city search, departure with explicit time zone, load in
-  pounds, and 10/25/50 mile checkpoint spacing.
-- Up to three distinct, genuine OSRM road options. When native alternatives are
-  limited, intermediate waypoints request additional roads. A warning explains
-  cases where fewer than three distinct options exist.
-- Weather at every checkpoint’s **estimated arrival time**, including origin
-  and destination. ETAs integrate per-road-segment duration, normalized to the
-  routing provider’s total to account for turns.
-- Exact weather thresholds and load rules, conservative risk-mile estimates,
-  and a transparent, deterministic route recommendation.
-- Interactive routes, all checkpoint markers, ETA/weather tooltips, a checkpoint
-  detail panel, comparison view, and a complete checkpoint table.
-- A canvas-rendered corridor heatmap with a **0–48 hour slider**, playback,
-  wind/rain/snow layers, overlay toggle, map zoom, and route fitting.
-- Responsive mobile layout, keyboard city selection, native modal focus
-  trapping, reduced-motion support, and self-hosted fonts.
-- A map-led dark/light workspace with persistent appearance settings and
-  compact route choices. Phone users open trip editing through **Edit trip**.
-  Explanations are available on demand.
-- An interactive journey weather strip, accessible with a pointer or keyboard,
-  and a compact recommendation tradeoff against the fastest road.
-- Departure comparisons at the current start, +2 hours, and +4 hours, using the
-  same fetched forecasts and load rules. Applying a time recalculates the trip.
-- Comfortable phone touch targets, text risk labels, and a focused trip-editing
-  sheet that keeps the map visible behind it.
-- JSON trip export and up to five saved trip inputs on the current device.
-- Timeouts, validation, request bounds, provider caching, a basic request
-  throttle, and actionable upstream error messages.
-
 ## Risk and recommendation
 
 | Condition | Low | Moderate | High | Severe | No Travel |
@@ -72,9 +62,8 @@ or checkpoint-spacing changes in the example scenario.
 | Rain, in/hr | <0.10 | 0.10–<0.25 | 0.25–<0.50 | 0.50–1.00 | >1.00 |
 | Snow, in/hr | <0.5 | 0.5–<1.0 | 1.0–<2.0 | 2.0–3.0 | >3.0 |
 
-The brief overlaps adjacent rain/snow bands at some exact boundaries. This
-implementation assigns those shared boundaries to the **higher** risk band;
-1.00 in/hr rain and 3.0 in/hr snow remain Severe, as specified.
+Shared rain/snow boundaries use the **higher** risk band. Rain at 1.00 in/hr
+and snow at 3.0 in/hr remain Severe.
 
 Load rules use strict weight comparisons:
 
@@ -82,8 +71,7 @@ Load rules use strict weight comparisons:
 - Wind ≥45 mph and load **>30,000 lb**: **No Travel**.
 - Wind ≥35 mph and load **>40,000 lb**: at least **Severe**.
 
-The highest condition wins. Wind uses 10 m **gusts**, a documented conservative
-interpretation of the brief’s wind measurement. Rain includes rain + showers,
+The highest condition wins. Wind uses 10 m **gusts**. Rain includes rain + showers,
 converted from mm to inches. Snowfall is converted from cm to inches.
 
 Each interval between checkpoints inherits the worse endpoint risk. Its whole
@@ -121,16 +109,16 @@ screenshots in `docs`, set `CAPTURE_MAPS=1` and run Playwright with
 `--grep "responsive workspace" --workers=1`. Captures wait for the visible
 tiles and theme transitions; public tile-service availability affects that run.
 
-## Architecture and APIs
+## Architecture and API
 
 ```text
-frontend/src/             React workspace, map, city search, accessible dialogs
-backend/config/          Django configuration and production WSGI entrypoint
-backend/routing/risk.py   Pure risk thresholds, mileage, and ranking
-backend/routing/sampling.py  Road distance + segment time interpolation
-backend/routing/providers.py OSRM and Open-Meteo adapters, caching, batching
-backend/routing/service.py   Checkpoint + corridor forecast orchestration
-backend/routing/demo.py      Explicit synthetic scenario on cached road geometry
+frontend/src/                React workspace, map, city search, and dialogs
+backend/config/              Django configuration and WSGI entrypoint
+backend/routing/risk.py       Risk thresholds, mileage, and ranking
+backend/routing/sampling.py   Road distance and segment-time interpolation
+backend/routing/providers.py  OSRM and Open-Meteo adapters, caching, batching
+backend/routing/service.py    Checkpoint forecasts and departure comparisons
+backend/routing/demo.py       Simulated weather on cached road geometry
 ```
 
 | Endpoint | Purpose |
@@ -140,7 +128,7 @@ backend/routing/demo.py      Explicit synthetic scenario on cached road geometry
 | `GET /api/demo/?interval=25&load=35000` | Labeled example scenario |
 | `POST /api/plan/` | Calculate live road/weather options |
 
-Example request:
+Example request (set `departure` to a timestamp within the next 48 hours):
 
 ```json
 {
@@ -180,20 +168,20 @@ docker build -t spotter .
 docker run --rm -p 8000:8000 -e DJANGO_DEBUG=0 -e DJANGO_SECRET_KEY=replace-with-a-random-secret -e DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1 spotter
 ```
 
-## Limits and next steps
+## Limitations
 
 OSRM’s public **driving** profile is not a truck-compliance engine: it does not
 check dimensions, axle/bridge weights, hazmat restrictions, hours-of-service,
 or traffic. ETAs exclude stops and driver breaks. Use a commercial truck
-routing profile for dispatch. The assessment explicitly permits third-party
-routing; the weather/load risk rules are implemented independently.
+routing profile for dispatch. Weather/load risk rules are implemented
+independently from the routing provider.
 
 Public OSRM/Open-Meteo services may rate-limit or be temporarily unavailable.
 For production traffic, use contracted services or self-host OSRM, a shared
 Redis cache/atomic throttle, background jobs, and a supported map tile plan.
 The included file cache and per-client throttle are intentionally lightweight
 and are not a distributed abuse-prevention system. Serverless cache contents
-are ephemeral. No authentication is needed for this stateless assessment app.
+are ephemeral. No authentication is needed for this stateless application.
 
 ## Sources and credits
 
@@ -203,5 +191,3 @@ are ephemeral. No authentication is needed for this stateless assessment app.
 - [OpenStreetMap data and map tiles](https://www.openstreetmap.org/copyright)
 - [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
 - Geist fonts (SIL Open Font License), Phosphor icons (MIT), Leaflet (BSD-2-Clause)
-
-See [the walkthrough script](docs/LOOM_SCRIPT.md) for a 5–10 minute demo outline.

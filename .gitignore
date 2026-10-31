@@ -18,3 +18,10 @@ frontend/*.tsbuildinfo
 fs-assessment-spotter.pdf
 CLAUDE.md
 tasks/
+
+# Personal preparation and development notes (keep local)
+/docs/DESIGN_REVIEW.md
+/docs/HOW_IT_WORKS.md
+/docs/LOOM_SCRIPT.md
+/docs/SUBMISSION.md
+/docs/VERIFICATION.md
